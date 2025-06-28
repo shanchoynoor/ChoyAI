@@ -1,4 +1,10 @@
+version: '3.8'
 services:
   app:
+    build: .
     volumes:
-      - ./:/app  # Syncs local files ↔ container
+      - ./:/app  # This critical line syncs host↔container
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Add other configs as needed
