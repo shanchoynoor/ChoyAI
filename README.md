@@ -1,2 +1,6 @@
-# choybot
-A Multi-persona AI Assistant
+# ChoyBot Project
+### [Original Description]
+Content from initial version...
+
+### [New Updates]
+Current project information...

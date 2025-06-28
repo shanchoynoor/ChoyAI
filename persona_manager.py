@@ -1,0 +1,140 @@
+import os
+import json
+import logging
+from typing import Dict, Optional, List
+from pathlib import Path
+from config import Config
+
+logger = logging.getLogger(__name__)
+
+class PersonaManager:
+    def __init__(self, prompts_dir: str = None):
+        self.prompts_dir = prompts_dir or Config.PROMPTS_DIR
+        self.personas = self._load_personas()
+        self._validate_personas()
+    
+    def _load_personas(self) -> Dict:
+        """Load personas from prompt files with JSON parsing"""
+        personas = {}
+        
+        if not os.path.exists(self.prompts_dir):
+            logger.error(f"Prompts directory not found: {self.prompts_dir}")
+            return personas
+
+        for filename in os.listdir(self.prompts_dir):
+            if filename.endswith('.txt'):
+                try:
+                    name = os.path.splitext(filename)[0]
+                    filepath = os.path.join(self.prompts_dir, filename)
+                    
+                    with open(filepath, 'r') as f:
+                        content = f.read().strip()
+                        
+                        # Try to parse as JSON first
+                        try:
+                            persona_data = json.loads(content)
+                            if not isinstance(persona_data, dict):
+                                raise ValueError("Invalid JSON format")
+                                
+                            # Validate required fields
+                            if 'name' not in persona_data:
+                                persona_data['name'] = name
+                            if 'system_prompt' not in persona_data:
+                                persona_data['system_prompt'] = self._generate_system_prompt(persona_data)
+                                
+                            personas[name] = persona_data
+                            
+                        except json.JSONDecodeError:
+                            # Fallback to plain text format
+                            personas[name] = {
+                                'name': name,
+                                'system_prompt': content,
+                                'style': 'Custom',
+                                'purpose': 'To interact with users'
+                            }
+                            
+                except Exception as e:
+                    logger.error(f"Error loading persona {filename}: {str(e)}")
+                    continue
+                    
+        return personas
+    
+    def _generate_system_prompt(self, persona: Dict) -> str:
+        """Generate system prompt from structured persona data"""
+        prompt_parts = [
+            f"# PERSONA PROFILE",
+            f"Name: {persona.get('name', 'Unknown')}",
+            f"Style: {persona.get('style', '')}",
+            f"Purpose: {persona.get('purpose', '')}",
+            f"Core Traits: {persona.get('persona_traits', '')}",
+            "",
+            "# BEHAVIORAL RULES",
+            persona.get('rules', ''),
+            "",
+            "# COMMUNICATION GUIDELINES",
+            f"Preferred catchphrases: {persona.get('catchphrases', '')}",
+            f"Available modes: {persona.get('modes', '')}",
+            "",
+            "# RESPONSE TEMPLATE",
+            "Respond EXACTLY in character with these traits:",
+            f"- {persona.get('persona_traits', '')}",
+            "Incorporate these elements:",
+            f"- {persona.get('persona_refs', '')}"
+        ]
+        
+        return "\n".join(prompt_parts)
+    
+    def _validate_personas(self):
+        """Ensure required personas exist and have valid data"""
+        required_personas = ['choy', 'stark', 'rose']
+        for persona in required_personas:
+            if persona not in self.personas:
+                logger.warning(f"Missing required persona: {persona}")
+    
+    def get_persona(self, name: str) -> Optional[Dict]:
+        """Get persona by name (case-insensitive) with full validation"""
+        persona = self.personas.get(name.lower())
+        if not persona:
+            return None
+            
+        # Ensure all required fields exist
+        defaults = {
+            'style': 'Custom',
+            'purpose': 'To interact with users',
+            'system_prompt': self._generate_system_prompt(persona),
+            'modes': {'default': 'Standard'}
+        }
+        
+        return {**defaults, **persona}
+    
+    def list_personas(self) -> List[Dict]:
+        """List all available personas with essential info"""
+        return [
+            {
+                'name': p['name'],
+                'style': p.get('style', ''),
+                'purpose': p.get('purpose', ''),
+                'modes': p.get('modes', {})
+            }
+            for p in self.personas.values()
+        ]
+    
+    def get_persona_system_prompt(self, name: str) -> Optional[str]:
+        """Get just the system prompt for a persona"""
+        persona = self.get_persona(name)
+        return persona.get('system_prompt') if persona else None
+    
+    def get_persona_mode(self, name: str, mode: str = 'default') -> Optional[Dict]:
+        """Get persona configuration for a specific mode"""
+        persona = self.get_persona(name)
+        if not persona:
+            return None
+            
+        mode_data = persona.get('modes', {}).get(mode)
+        if not mode_data:
+            return persona
+            
+        # Return persona with mode-specific overrides
+        if isinstance(mode_data, dict):
+            return {**persona, **mode_data}
+        return persona
