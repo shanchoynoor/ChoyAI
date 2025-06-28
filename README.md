@@ -1,6 +1,7 @@
 # ChoyBot Project
-### [Original Description]
-Content from initial version...
 
-### [New Updates]
-Current project information...
+## 🔄 Development Workflow Tips
+*Always follow these practices when updating the project:*
+1. Pull latest changes before editing:
+   ```bash
+   git pull origin main
