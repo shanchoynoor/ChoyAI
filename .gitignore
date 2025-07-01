@@ -12,6 +12,7 @@ __pycache__/
 # Virtual environment
 venv/
 env/
+.env
 
 # Data folders (if you want to exclude them)
 chroma_data/
