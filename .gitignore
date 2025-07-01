@@ -3,3 +3,23 @@
 *.db
 *.log
 venv/
+=======
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+
+# Data folders (if you want to exclude them)
+chroma_data/
+db/chroma/
+
+# Ignore Python egg files
+*.egg-info/
+
+# VSCode / IDE configs (optional)
+.vscode/
+.idea/
