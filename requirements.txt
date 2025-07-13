@@ -1,6 +1,6 @@
 # Core dependencies
 python-telegram-bot==20.5
-deepseek-sdk>=1.2.0
+deepseek-sdk>=0.1.0
 python-dotenv>=1.0.0
 sqlalchemy>=2.0.23
 pydantic>=2.5.2
@@ -12,7 +12,6 @@ fastapi>=0.104.1
 
 # Database
 alembic>=1.13.0
-sqlite3
 
 # AI & ML
 openai>=1.35.0

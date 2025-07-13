@@ -261,6 +261,13 @@ def log_ai_interaction(persona: str, user_id: str, message_length: int, response
     )
 
 
+def log_system_activity(action: str, metadata: dict = None):
+    """Log system activity - simplified version for testing"""
+    logger = logging.getLogger("system_activity")
+    metadata_str = f" | {metadata}" if metadata else ""
+    logger.info(f"System Activity: {action}{metadata_str}")
+
+
 # Performance decorator
 def performance_monitor(operation_name: str = None):
     """Decorator to monitor function performance"""

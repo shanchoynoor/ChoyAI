@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  choyai:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: choyai-brain:latest
+    container_name: choyai-brain
+    restart: unless-stopped
+    environment:
+      # Core settings
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      
+      # Telegram Bot
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_USE_POLLING=${TELEGRAM_USE_POLLING:-true}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+      
+      # AI Providers (DeepSeek is required, others optional)
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/choyai.db}
+      
+      # Security
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-30}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+      
+    volumes:
+      # Persistent data storage
+      - choyai_data:/app/data
+      - choyai_logs:/app/logs
+      
+      # Optional: Mount .env file for local development
+      # - ./.env:/app/.env:ro
+      
+    networks:
+      - choyai_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: choyai-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - choyai_redis:/data
+    networks:
+      - choyai_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+
+  # Optional: PostgreSQL for production database
+  postgres:
+    image: postgres:15-alpine
+    container_name: choyai-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-choyai}
+      - POSTGRES_USER=${POSTGRES_USER:-choyai}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - choyai_postgres:/var/lib/postgresql/data
+    networks:
+      - choyai_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+
+  # Optional: Nginx reverse proxy for webhooks
+  nginx:
+    image: nginx:alpine
+    container_name: choyai-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - choyai
+    networks:
+      - choyai_network
+    profiles:
+      - webhook
+
+volumes:
+  choyai_data:
+    driver: local
+  choyai_logs:
+    driver: local
+  choyai_redis:
+    driver: local
+  choyai_postgres:
+    driver: local
+
+networks:
+  choyai_network:
+    driver: bridge

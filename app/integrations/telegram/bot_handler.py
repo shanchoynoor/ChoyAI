@@ -38,6 +38,109 @@ class TelegramBotHandler:
         self.message_count = 0
         self.start_time = datetime.now()
         
+        # User onboarding state tracking
+        self.user_onboarding_state = {}
+        
+    def get_time_based_greeting(self) -> str:
+        """Get appropriate greeting based on current time"""
+        current_hour = datetime.now().hour
+        
+        if 5 <= current_hour < 12:
+            return "Good morning"
+        elif 12 <= current_hour < 17:
+            return "Good afternoon"
+        elif 17 <= current_hour < 21:
+            return "Good evening"
+        else:
+            return "Good night"
+    
+    async def check_user_onboarding_status(self, user_id: str) -> Dict[str, Any]:
+        """Check if user has completed onboarding questions"""
+        try:
+            # Check if user profile exists and has basic info
+            profile = await self.ai_engine.user_profile_manager.get_user_profile(user_id)
+            
+            if not profile:
+                return {
+                    "completed": False,
+                    "next_question": "city",
+                    "questions_answered": 0
+                }
+            
+            # Check which questions have been answered
+            questions_answered = 0
+            next_question = None
+            
+            if not profile.location:
+                next_question = "city"
+            else:
+                questions_answered += 1
+                if not profile.age:
+                    next_question = "age"
+                else:
+                    questions_answered += 1
+                    if not profile.profession:
+                        next_question = "profession"
+                    else:
+                        questions_answered += 1
+            
+            return {
+                "completed": questions_answered == 3,
+                "next_question": next_question,
+                "questions_answered": questions_answered
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error checking onboarding status: {e}")
+            return {
+                "completed": False,
+                "next_question": "city",
+                "questions_answered": 0
+            }
+    
+    async def get_onboarding_question(self, question_type: str) -> str:
+        """Get the next onboarding question"""
+        questions = {
+            "city": "🏙️ Which city do you live in?",
+            "age": "🎂 How old are you?",
+            "profession": "💼 What do you do for work or study?"
+        }
+        return questions.get(question_type, "")
+    
+    async def process_onboarding_answer(self, user_id: str, message: str, question_type: str) -> bool:
+        """Process user's answer to onboarding question"""
+        try:
+            # Extract information based on question type
+            if question_type == "city":
+                # Extract city/location information
+                await self.ai_engine.user_profile_manager.update_user_info(
+                    user_id=user_id,
+                    city=message.strip(),
+                    platform="telegram"
+                )
+            elif question_type == "age":
+                # Extract age information
+                age_str = ''.join(filter(str.isdigit, message))
+                if age_str:
+                    await self.ai_engine.user_profile_manager.update_user_info(
+                        user_id=user_id,
+                        age=int(age_str),
+                        platform="telegram"
+                    )
+            elif question_type == "profession":
+                # Extract profession information
+                await self.ai_engine.user_profile_manager.update_user_info(
+                    user_id=user_id,
+                    profession=message.strip(),
+                    platform="telegram"
+                )
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error processing onboarding answer: {e}")
+            return False
+    
     async def initialize(self):
         """Initialize the Telegram bot"""
         self.logger.info("🤖 Initializing Telegram Bot...")
@@ -154,27 +257,62 @@ class TelegramBotHandler:
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
+        user_id = str(user.id)
         
-        welcome_msg = f"""
-🧠 **Welcome to Choy AI Brain, {user.first_name}!**
+        # Get time-based greeting
+        time_greeting = self.get_time_based_greeting()
+        
+        # Check onboarding status
+        onboarding_status = await self.check_user_onboarding_status(user_id)
+        
+        # Personalized greeting with time
+        greeting_msg = f"Hi {user.first_name}! {time_greeting}! 👋"
+        
+        if not onboarding_status["completed"]:
+            # User needs onboarding
+            next_question = onboarding_status["next_question"]
+            question_text = await self.get_onboarding_question(next_question)
+            
+            welcome_msg = f"""
+{greeting_msg}
+
+🧠 **Welcome to Choy AI Brain!**
+
+I'm your intelligent personal assistant with long-term memory and multiple personalities. Before we start chatting, I'd love to get to know you better!
+
+Let me ask you a few quick questions to personalize our conversations:
+
+{question_text}
+"""
+            
+            # Track onboarding state
+            self.user_onboarding_state[user_id] = {
+                "active": True,
+                "next_question": next_question,
+                "questions_answered": onboarding_status["questions_answered"]
+            }
+            
+        else:
+            # User has completed onboarding
+            welcome_msg = f"""
+{greeting_msg}
+
+🧠 **Welcome back to Choy AI Brain!**
 
 I'm your intelligent personal assistant with long-term memory and multiple personalities.
 
 **Available Commands:**
-• `/persona <n>` - Switch AI personality
+• `/persona <name>` - Switch AI personality (choy, stark, rose)
 • `/personas` - List available personalities  
 • `/remember <key> <value>` - Save a memory
 • `/recall <key>` - Retrieve a memory
 • `/memories` - List all your memories
-• `/forget <key>` - Delete a memory
-• `/bio <text>` - Set your biography
-• `/history` - View conversation history
-• `/stats` - View AI statistics
-• `/myid` - Show your user info
-• `/help` - Show this help message
+• `/profile` - View your AI-generated profile
+• `/providers` - Show AI provider status
+• `/help` - Show complete help guide
 
 **Current Personalities:**
-🎭 **choy** - Confident, strategic, direct
+🎭 **choy** - Confident, strategic, direct (default)
 🤖 **stark** - Tech genius, sarcastic, innovative  
 🌹 **rose** - Warm, empathetic, supportive
 
@@ -184,45 +322,60 @@ Just start chatting with me naturally! I'll remember our conversations and provi
         await update.message.reply_text(welcome_msg, parse_mode='Markdown')
         
         # Log new user
-        self.logger.info(f"👋 New user started: {user.id} (@{user.username})")
+        self.logger.info(f"👋 New user started: {user.id} (@{user.username}) - Onboarding: {onboarding_status['completed']}")
     
     async def handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
-        help_msg = """
+        user_id = str(update.effective_user.id)
+        
+        # Check if user has completed onboarding
+        onboarding_status = await self.check_user_onboarding_status(user_id)
+        
+        if not onboarding_status["completed"]:
+            help_msg = """
+🧠 **Choy AI Brain - Getting Started**
+
+Hi! I noticed you haven't completed the initial setup yet. 
+
+To get started, please use `/start` and I'll ask you a few quick questions:
+• Which city do you live in?
+• How old are you? 
+• What do you do for work or study?
+
+This helps me provide more personalized assistance! After that, you'll have access to all my features.
+"""
+        else:
+            help_msg = """
 🧠 **Choy AI Brain - Help Guide**
 
 **Basic Usage:**
 Just chat with me naturally! I understand context and remember our conversations.
 
+**Personality System:**
+• I start with the **Choy** persona by default (confident, strategic, direct)
+• Switch personalities anytime with `/persona <name>`:
+  - `/persona choy` - Confident, strategic, direct
+  - `/persona stark` - Tech genius, sarcastic, innovative
+  - `/persona rose` - Warm, empathetic, supportive
+
+**Core Commands:**
+• `/start` - Welcome message and setup
+• `/help` - This help guide
+• `/persona <name>` - Switch personality (choy, stark, rose)
+• `/personas` - List all available personalities
+• `/myid` - Show your user information
+
 **Memory System:**
 • I automatically remember important details from our chats
-• Use `/remember` to explicitly save key information
-• Use `/recall` to retrieve specific memories
-• Use `/memories` to see all stored memories
-
-**Personality System:**
-• Switch between different AI personalities using `/persona`
-• Each personality has unique traits and response styles
-• Your personality preference is remembered
-
-**Commands:**
-• `/start` - Welcome message and overview
-• `/help` - This help guide
-• `/persona <n>` - Switch personality (choy, stark, rose)
-• `/personas` - List all available personalities
-• `/remember <key> <value> [context]` - Save memory
-• `/recall <key>` - Get specific memory
-• `/memories` - List all memories
+• `/remember <key> <value>` - Save specific information
+• `/recall <key>` - Retrieve saved information
+• `/memories` - List all your saved memories
 • `/forget <key>` - Delete a memory
-• `/bio <text>` - Set your biography
-• `/history [limit]` - View conversation history
-• `/stats` - View AI performance statistics
-• `/myid` - Show your user information
 
 **AI Provider Commands:**
 • `/providers` - Show available AI providers and status
-• `/switchai <task> <provider>` - Switch AI provider for tasks
-• `/aitask <task> <message>` - Force specific task type
+• `/switchai <task> <provider>` - Switch AI provider for specific tasks
+• `/aitask <task> <message>` - Force a specific task type
 
 **User Profile Commands:**
 • `/profile` - View your AI-generated profile
@@ -246,6 +399,12 @@ Just chat with me naturally! I understand context and remember our conversations
 • Try different personalities for different types of conversations
 • I learn from our interactions to provide better responses over time
 • Use different AI providers for specialized tasks
+
+**Examples:**
+• "Hi, how are you?" - Normal conversation
+• `/persona stark` - Switch to tech genius personality
+• `/remember birthday April 15` - Save important date
+• `/aitask creative Write a poem about space` - Force creative task
 
 Need help with something specific? Just ask me!
 """
@@ -441,6 +600,7 @@ This ID is used to link your memories and conversations.
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle regular chat messages"""
         user_id = str(update.effective_user.id)
+        user = update.effective_user
         message = update.message.text
         
         self.message_count += 1
@@ -452,7 +612,35 @@ This ID is used to link your memories and conversations.
         )
         
         try:
-            # Process message through AI engine
+            # Check if user is in onboarding process
+            if user_id in self.user_onboarding_state and self.user_onboarding_state[user_id]["active"]:
+                await self._handle_onboarding_response(update, user_id, message)
+                return
+            
+            # Check if user needs onboarding
+            onboarding_status = await self.check_user_onboarding_status(user_id)
+            if not onboarding_status["completed"]:
+                # Start onboarding process
+                next_question = onboarding_status["next_question"]
+                question_text = await self.get_onboarding_question(next_question)
+                
+                response = f"""
+Before we continue chatting, I'd love to get to know you better! 
+
+{question_text}
+"""
+                
+                # Track onboarding state
+                self.user_onboarding_state[user_id] = {
+                    "active": True,
+                    "next_question": next_question,
+                    "questions_answered": onboarding_status["questions_answered"]
+                }
+                
+                await update.message.reply_text(response, parse_mode='Markdown')
+                return
+            
+            # Regular message processing for completed onboarding users
             result = await self.ai_engine.process_message(
                 user_id=user_id,
                 message=message,
@@ -480,6 +668,63 @@ This ID is used to link your memories and conversations.
             # Fallback without markdown if parsing fails
             await update.message.reply_text(response)
             self.logger.warning(f"Markdown parsing failed: {e}")
+    
+    async def _handle_onboarding_response(self, update: Update, user_id: str, message: str):
+        """Handle user responses during onboarding"""
+        try:
+            user = update.effective_user
+            onboarding_state = self.user_onboarding_state[user_id]
+            current_question = onboarding_state["next_question"]
+            
+            # Process the answer
+            success = await self.process_onboarding_answer(user_id, message, current_question)
+            
+            if success:
+                # Update questions answered count
+                onboarding_state["questions_answered"] += 1
+                
+                # Determine next question
+                next_question = None
+                if current_question == "city":
+                    next_question = "age"
+                elif current_question == "age":
+                    next_question = "profession"
+                
+                if next_question:
+                    # Ask next question
+                    question_text = await self.get_onboarding_question(next_question)
+                    response = f"Great! Thanks for sharing. 😊\n\n{question_text}"
+                    
+                    # Update state
+                    onboarding_state["next_question"] = next_question
+                    
+                else:
+                    # Onboarding complete
+                    time_greeting = self.get_time_based_greeting()
+                    response = f"""
+Perfect! Thank you for sharing those details with me. 🎉
+
+Now I can provide you with more personalized assistance! I'm ChoyAI, and by default, I have a confident, strategic, and direct personality. 
+
+You can switch to different personalities anytime:
+• `/persona stark` - Tech genius, sarcastic, innovative
+• `/persona rose` - Warm, empathetic, supportive  
+• `/persona choy` - Back to confident, strategic, direct
+
+What would you like to chat about, {user.first_name}? I'm here to help with anything you need! 💭
+"""
+                    
+                    # Mark onboarding as complete
+                    self.user_onboarding_state[user_id]["active"] = False
+                
+            else:
+                response = "I didn't quite catch that. Could you please try again?"
+            
+            await update.message.reply_text(response, parse_mode='Markdown')
+            
+        except Exception as e:
+            self.logger.error(f"Error handling onboarding response: {e}")
+            await update.message.reply_text("Sorry, I encountered an error. Please try again.")
     
     async def handle_error(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle bot errors"""

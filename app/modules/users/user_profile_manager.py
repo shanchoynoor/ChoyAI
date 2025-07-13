@@ -276,6 +276,45 @@ class UserProfileManager:
             self.logger.error(f"Error processing conversation for user {user_id}: {e}")
             return {}, {}
     
+    async def update_user_info(
+        self,
+        user_id: str,
+        platform: str = "telegram",
+        **user_data
+    ) -> bool:
+        """Update user information directly (used for onboarding)"""
+        try:
+            # Filter and prepare the user data
+            extracted_info = {}
+            platform_data = {}
+            
+            # Handle platform-specific data
+            if platform == "telegram":
+                for field in ['username', 'first_name', 'last_name']:
+                    if field in user_data:
+                        platform_data[field] = user_data[field]
+            
+            # Handle profile fields
+            profile_fields = ['name', 'age', 'city', 'profession', 'interests', 'education', 'goals']
+            for field in profile_fields:
+                if field in user_data and user_data[field] is not None:
+                    extracted_info[field] = user_data[field]
+            
+            # Update the profile
+            updated_profile = await self._update_user_profile(
+                user_id=user_id,
+                platform=platform,
+                extracted_info=extracted_info,
+                platform_data=platform_data
+            )
+            
+            self.logger.info(f"Updated user info for {user_id}: {list(extracted_info.keys())}")
+            return bool(updated_profile)
+            
+        except Exception as e:
+            self.logger.error(f"Error updating user info for {user_id}: {e}")
+            return False
+
     async def _extract_information(self, message: str, message_type: str) -> Dict[str, Any]:
         """Extract structured information from message"""
         if message_type != "user_message":
@@ -379,30 +418,30 @@ class UserProfileManager:
         session_id: Optional[str]
     ):
         """Save conversation record to database"""
-        async with asyncio.get_event_loop().run_in_executor(None, self.SessionLocal) as session:
-            try:
-                conversation = UserConversation(
-                    user_id=user_id,
-                    platform=platform,
-                    message_type=message_type,
-                    content=content,
-                    persona_used=persona_used,
-                    ai_provider=ai_provider,
-                    task_type=task_type,
-                    extracted_info=extracted_info,
-                    sentiment=sentiment,
-                    topics=topics,
-                    intent=intent,
-                    session_id=session_id
-                )
-                session.add(conversation)
-                session.commit()
-                
-            except Exception as e:
-                session.rollback()
-                self.logger.error(f"Error saving conversation: {e}")
-            finally:
-                session.close()
+        session = self.SessionLocal()
+        try:
+            conversation = UserConversation(
+                user_id=user_id,
+                platform=platform,
+                message_type=message_type,
+                content=content,
+                persona_used=persona_used,
+                ai_provider=ai_provider,
+                task_type=task_type,
+                extracted_info=extracted_info,
+                sentiment=sentiment,
+                topics=topics,
+                intent=intent,
+                session_id=session_id
+            )
+            session.add(conversation)
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error saving conversation: {e}")
+        finally:
+            session.close()
     
     async def _update_user_profile(
         self,
@@ -412,71 +451,71 @@ class UserProfileManager:
         platform_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Update user profile with extracted information"""
-        async with asyncio.get_event_loop().run_in_executor(None, self.SessionLocal) as session:
-            try:
-                # Get or create user profile
-                profile = session.query(UserProfile).filter_by(user_id=user_id).first()
-                
-                if not profile:
-                    profile = UserProfile(
-                        user_id=user_id,
-                        platform=platform,
-                        preferences={},
-                        confidence_scores={}
-                    )
-                    session.add(profile)
-                
-                # Update platform-specific data
-                if platform_data and platform == "telegram":
-                    if 'username' in platform_data:
-                        profile.telegram_username = platform_data['username']
-                    if 'first_name' in platform_data:
-                        profile.telegram_first_name = platform_data['first_name']
-                    if 'last_name' in platform_data:
-                        profile.telegram_last_name = platform_data['last_name']
-                
-                # Update extracted information with confidence scoring
-                updated_fields = {}
-                for field, value in extracted_info.items():
-                    if field in ['interests', 'goals', 'personality_traits']:
-                        # Handle list fields - merge with existing
-                        existing = getattr(profile, field, []) or []
-                        if isinstance(value, list):
-                            new_items = [item for item in value if item not in existing]
-                            if new_items:
-                                setattr(profile, field, existing + new_items)
-                                updated_fields[field] = new_items
-                        else:
-                            if value not in existing:
-                                setattr(profile, field, existing + [value])
-                                updated_fields[field] = [value]
+        session = self.SessionLocal()
+        try:
+            # Get or create user profile
+            profile = session.query(UserProfile).filter_by(user_id=user_id).first()
+            
+            if not profile:
+                profile = UserProfile(
+                    user_id=user_id,
+                    platform=platform,
+                    preferences={},
+                    confidence_scores={}
+                )
+                session.add(profile)
+            
+            # Update platform-specific data
+            if platform_data and platform == "telegram":
+                if 'username' in platform_data:
+                    profile.telegram_username = platform_data['username']
+                if 'first_name' in platform_data:
+                    profile.telegram_first_name = platform_data['first_name']
+                if 'last_name' in platform_data:
+                    profile.telegram_last_name = platform_data['last_name']
+            
+            # Update extracted information with confidence scoring
+            updated_fields = {}
+            for field, value in extracted_info.items():
+                if field in ['interests', 'goals', 'personality_traits']:
+                    # Handle list fields - merge with existing
+                    existing = getattr(profile, field, []) or []
+                    if isinstance(value, list):
+                        new_items = [item for item in value if item not in existing]
+                        if new_items:
+                            setattr(profile, field, existing + new_items)
+                            updated_fields[field] = new_items
                     else:
-                        # Handle single value fields
-                        current_value = getattr(profile, field, None)
-                        if not current_value or self._should_update_field(field, current_value, value):
-                            setattr(profile, field, value)
-                            updated_fields[field] = value
-                            
-                            # Update confidence score
-                            if not profile.confidence_scores:
-                                profile.confidence_scores = {}
-                            profile.confidence_scores[field] = 0.8  # Base confidence
-                
-                # Update timestamps
-                profile.updated_at = datetime.now()
-                profile.last_interaction = datetime.now()
-                
-                session.commit()
-                
-                self.logger.info(f"Updated profile for user {user_id}: {list(updated_fields.keys())}")
-                return updated_fields
-                
-            except Exception as e:
-                session.rollback()
-                self.logger.error(f"Error updating user profile: {e}")
-                return {}
-            finally:
-                session.close()
+                        if value not in existing:
+                            setattr(profile, field, existing + [value])
+                            updated_fields[field] = [value]
+                else:
+                    # Handle single value fields
+                    current_value = getattr(profile, field, None)
+                    if not current_value or self._should_update_field(field, current_value, value):
+                        setattr(profile, field, value)
+                        updated_fields[field] = value
+                        
+                        # Update confidence score
+                        if not profile.confidence_scores:
+                            profile.confidence_scores = {}
+                        profile.confidence_scores[field] = 0.8  # Base confidence
+            
+            # Update timestamps
+            profile.updated_at = datetime.now()
+            profile.last_interaction = datetime.now()
+            
+            session.commit()
+            
+            self.logger.info(f"Updated profile for user {user_id}: {list(updated_fields.keys())}")
+            return updated_fields
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error updating user profile: {e}")
+            return {}
+        finally:
+            session.close()
     
     def _should_update_field(self, field: str, current_value: Any, new_value: Any) -> bool:
         """Determine if a field should be updated"""
@@ -492,41 +531,41 @@ class UserProfileManager:
     
     async def get_user_profile(self, user_id: str) -> Optional[UserPersona]:
         """Get complete user profile"""
-        async with asyncio.get_event_loop().run_in_executor(None, self.SessionLocal) as session:
-            try:
-                profile = session.query(UserProfile).filter_by(user_id=user_id).first()
-                if not profile:
-                    return None
-                
-                return UserPersona(
-                    user_id=profile.user_id,
-                    platform=profile.platform,
-                    name=profile.name,
-                    age=profile.age,
-                    city=profile.city,
-                    country=profile.country,
-                    profession=profile.profession,
-                    education=profile.education,
-                    background=profile.background,
-                    interests=profile.interests or [],
-                    personality_traits=profile.personality_traits or [],
-                    communication_style=profile.communication_style,
-                    language_preference=profile.language_preference,
-                    timezone=profile.timezone,
-                    relationship_status=profile.relationship_status,
-                    family=profile.family,
-                    goals=profile.goals or [],
-                    preferences=profile.preferences or {},
-                    confidence_scores=profile.confidence_scores or {},
-                    created_at=profile.created_at,
-                    updated_at=profile.updated_at
-                )
-                
-            except Exception as e:
-                self.logger.error(f"Error getting user profile: {e}")
+        session = self.SessionLocal()
+        try:
+            profile = session.query(UserProfile).filter_by(user_id=user_id).first()
+            if not profile:
                 return None
-            finally:
-                session.close()
+            
+            return UserPersona(
+                user_id=profile.user_id,
+                platform=profile.platform,
+                name=profile.name,
+                age=profile.age,
+                city=profile.city,
+                country=profile.country,
+                profession=profile.profession,
+                education=profile.education,
+                background=profile.background,
+                interests=profile.interests or [],
+                personality_traits=profile.personality_traits or [],
+                communication_style=profile.communication_style,
+                language_preference=profile.language_preference,
+                timezone=profile.timezone,
+                relationship_status=profile.relationship_status,
+                family=profile.family,
+                goals=profile.goals or [],
+                preferences=profile.preferences or {},
+                confidence_scores=profile.confidence_scores or {},
+                created_at=profile.created_at,
+                updated_at=profile.updated_at
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error getting user profile: {e}")
+            return None
+        finally:
+            session.close()
     
     async def get_conversation_history(
         self,

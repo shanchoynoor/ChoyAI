@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  choyai-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: choyai-brain:dev
+    container_name: choyai-brain-dev
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=development
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_USE_POLLING=true
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DATABASE_URL=sqlite:///app/data/choyai_dev.db
+    volumes:
+      # Mount source code for live development
+      - .:/app
+      - choyai_dev_data:/app/data
+      - choyai_dev_logs:/app/logs
+    networks:
+      - choyai_dev_network
+    ports:
+      - "8000:8000"
+    command: ["python", "-m", "app.main"]
+
+volumes:
+  choyai_dev_data:
+  choyai_dev_logs:
+
+networks:
+  choyai_dev_network:
