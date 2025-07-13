@@ -92,13 +92,13 @@ init-db: ## Initialize database with schema
 # Maintenance commands
 clean: ## Clean up containers and images
 	@echo "🧹 Cleaning up..."
-	docker-compose down --rmi all --volumes --remove-orphans
+	docker-compose -f config/docker-compose.yml down --rmi all --volumes --remove-orphans
 	docker system prune -f
 	@echo "✅ Cleanup complete"
 
 clean-all: ## Clean everything including volumes
 	@echo "🧹 Cleaning everything..."
-	docker-compose down --rmi all --volumes --remove-orphans
+	docker-compose -f config/docker-compose.yml down --rmi all --volumes --remove-orphans
 	docker volume prune -f
 	docker system prune -a -f
 	@echo "✅ Complete cleanup done"
@@ -114,7 +114,7 @@ update: ## Update and rebuild
 # Monitoring and debugging
 status: ## Show container status
 	@echo "📊 Container Status:"
-	docker-compose ps
+	docker-compose -f config/docker-compose.yml ps
 
 health: ## Check health status
 	@echo "🏥 Health Check:"
@@ -150,7 +150,7 @@ deploy-vps: ## Deploy to VPS (requires .env file)
 setup-env: ## Create .env template
 	@echo "📝 Creating .env template..."
 	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
+		cp config/.env.example .env; \
 		echo "✅ .env file created from template"; \
 		echo "📝 Please edit .env with your API keys"; \
 	else \
@@ -179,7 +179,7 @@ security-scan: ## Run security scan on image
 # Monitoring
 monitor: ## Monitor logs in real-time
 	@echo "📊 Monitoring ChoyAI Brain..."
-	docker-compose logs -f --tail=100
+	docker-compose -f config/docker-compose.yml logs -f --tail=100
 
 install-deps: ## Install system dependencies for VPS
 	@echo "📦 Installing system dependencies..."
@@ -226,10 +226,10 @@ debug: ## Show detailed container and error information
 	@echo "=========================="
 	@echo ""
 	@echo "📊 Container Status:"
-	docker-compose ps
+	docker-compose -f config/docker-compose.yml ps
 	@echo ""
 	@echo "🔍 Main Container Logs (last 50 lines):"
-	docker-compose logs --tail=50 choyai
+	docker-compose -f config/docker-compose.yml logs --tail=50 choyai
 	@echo ""
 	@echo "💾 Resource Usage:"
 	docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null || echo "No running containers"
@@ -239,15 +239,15 @@ debug: ## Show detailed container and error information
 
 logs-error: ## Show only error logs from main container
 	@echo "❌ ChoyAI Error Logs:"
-	docker-compose logs choyai | grep -i error || echo "No error logs found"
+	docker-compose -f config/docker-compose.yml logs choyai | grep -i error || echo "No error logs found"
 
 logs-tail: ## Show recent logs from main container
 	@echo "📋 Recent ChoyAI Logs:"
-	docker-compose logs --tail=20 choyai
+	docker-compose -f config/docker-compose.yml logs --tail=20 choyai
 
 restart-main: ## Restart only the main ChoyAI container
 	@echo "🔄 Restarting ChoyAI main container..."
-	docker-compose restart choyai
+	docker-compose -f config/docker-compose.yml restart choyai
 	@echo "✅ Main container restarted"
 
 force-rebuild: ## Force rebuild without cache and restart
