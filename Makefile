@@ -377,6 +377,40 @@ run-no-check: ## Run without environment validation
 	@echo "✅ Production server started"
 	@echo "📊 View logs with: make logs"
 
+nuclear-clean: ## Nuclear option - stop and remove ALL containers and networks
+	@echo "💀 NUCLEAR CLEANUP - Stopping and removing ALL containers..."
+	@echo "⚠️  This will stop ALL Docker containers on the system!"
+	@read -p "Are you sure? (y/N): " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		docker stop $$(docker ps -aq) 2>/dev/null || true; \
+		docker rm $$(docker ps -aq) 2>/dev/null || true; \
+		docker network prune -f; \
+		docker volume prune -f; \
+		echo "✅ All containers removed"; \
+	else \
+		echo "❌ Cleanup cancelled"; \
+	fi
+
+clean-duplicates: ## Clean duplicate containers and conflicting services
+	@echo "🧹 Cleaning duplicate containers..."
+	@echo "🛑 Stopping conflicting containers..."
+	@docker stop choyai-brain choyai-redis choyai-postgres 2>/dev/null || true
+	@docker stop choynews-bot choynews-redis choynews-postgres 2>/dev/null || true
+	@echo "🗑️ Removing stopped containers..."
+	@docker rm choyai-brain choyai-redis choyai-postgres 2>/dev/null || true
+	@docker rm choynews-bot choynews-redis choynews-postgres 2>/dev/null || true
+	@echo "🌐 Cleaning networks..."
+	@docker network prune -f
+	@echo "✅ Duplicate cleanup complete"
+
+fresh-start: ## Complete fresh start - clean duplicates and restart ChoyAI
+	@echo "🔄 Performing complete fresh start..."
+	@make clean-duplicates
+	@make env-fix-location
+	@make build
+	@make run-no-check
+	@echo "✅ Fresh start complete"
+
 env-debug: ## Run comprehensive environment debugging
 	@echo "🔍 Running environment diagnostics..."
 	@bash deployment/env-fix.sh
