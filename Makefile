@@ -242,3 +242,14 @@ restart-main: ## Restart only the main ChoyAI container
 	@echo "🔄 Restarting ChoyAI main container..."
 	docker-compose restart choyai
 	@echo "✅ Main container restarted"
+
+force-rebuild: ## Force rebuild without cache and restart
+	@echo "🔄 Force rebuilding ChoyAI (no cache)..."
+	make stop
+	docker-compose build --no-cache --pull
+	make run
+	@echo "✅ Force rebuild complete"
+
+check-imports: ## Check if TaskType is properly exported
+	@echo "🔍 Checking TaskType import..."
+	docker-compose exec choyai python -c "from app.core.ai_providers import TaskType; print('✅ TaskType import successful')" || echo "❌ TaskType import failed"
