@@ -1,7 +1,16 @@
 """
 Core AI Engine for Choy AI Brain
 
-This is the central processing unit that handles:
+This is the central processing unit tha            # Initialize persona manager
+            self.persona_manager = PersonaManager()
+            await self.persona_manager.initialize()
+            
+            # Initialize user profile manager
+            self.user_profile_manager = UserProfileManager()
+            
+            # Initialize AI Provider Manager
+            self.ai_provider_manager = AIProviderManager()
+            await self.ai_provider_manager.initialize()es:
 - Conversation processing with long-term memory
 - Persona-based response generation
 - Context management across conversations
@@ -19,6 +28,7 @@ from app.modules.memory.user_memory import UserMemoryManager
 from app.modules.memory.conversation_memory import ConversationMemoryManager
 from app.modules.personas.persona_manager import PersonaManager
 from app.modules.chat.chat_engine import ChatEngine
+from app.modules.users.user_profile_manager import UserProfileManager
 from app.core.ai_providers import AIProviderManager, AIMessage, TaskType
 from app.config.settings import settings
 
@@ -49,6 +59,7 @@ class ChoyAIEngine:
         self.persona_manager: Optional[PersonaManager] = None
         self.chat_engine: Optional[ChatEngine] = None
         self.ai_provider_manager: Optional[AIProviderManager] = None
+        self.user_profile_manager: Optional[UserProfileManager] = None
         
         # Active conversations
         self.active_conversations: Dict[str, ConversationContext] = {}
@@ -127,12 +138,52 @@ class ChoyAIEngine:
                 conversation_id, user_id, platform, persona
             )
             
+            # Process user message for profiling
+            platform_data = context.get('platform_data', {}) if context else {}
+            
+            # Extract user information and save conversation
+            extracted_info, updated_profile = await self.user_profile_manager.process_conversation(
+                user_id=user_id,
+                message=message,
+                message_type="user_message",
+                platform=platform,
+                persona_used=conversation_ctx.persona,
+                platform_data=platform_data,
+                session_id=conversation_ctx.session_id
+            )
+            
+            # Get user profile for enhanced context
+            user_profile = await self.user_profile_manager.get_user_profile(user_id)
+            
+            # Enhanced context with user profile
+            enhanced_context = context.copy() if context else {}
+            enhanced_context.update({
+                'user_profile': user_profile,
+                'extracted_info': extracted_info,
+                'updated_profile': updated_profile
+            })
+            
             # Process the message through chat engine
             response = await self.chat_engine.process_message(
                 user_id=user_id,
                 message=message,
                 conversation_context=conversation_ctx,
-                additional_context=context
+                additional_context=enhanced_context
+            )
+            
+            # Save AI response to conversation history
+            ai_provider = enhanced_context.get('ai_provider_used', 'unknown')
+            task_type = enhanced_context.get('task_type_used', 'conversation')
+            
+            await self.user_profile_manager.process_conversation(
+                user_id=user_id,
+                message=response,
+                message_type="ai_response",
+                platform=platform,
+                persona_used=conversation_ctx.persona,
+                ai_provider=ai_provider,
+                task_type=task_type,
+                session_id=conversation_ctx.session_id
             )
             
             # Update conversation metrics
@@ -144,8 +195,10 @@ class ChoyAIEngine:
             response_time = (datetime.now() - start_time).total_seconds()
             self._update_response_time_metric(response_time)
             
+            # Log with user insights
+            user_insights = f" (Profile: {user_profile.name if user_profile and user_profile.name else 'Unknown'})"
             self.logger.debug(
-                f"💬 Processed message for user {user_id} "
+                f"💬 Processed message for user {user_id}{user_insights} "
                 f"in {response_time:.2f}s with persona '{conversation_ctx.persona}'"
             )
             
@@ -428,6 +481,41 @@ class ChoyAIEngine:
             
         except Exception as e:
             self.logger.error(f"❌ Error during AI Engine shutdown: {e}")
+
+    async def get_user_profile(self, user_id: str) -> Optional[Any]:
+        """Get comprehensive user profile"""
+        if not self.user_profile_manager:
+            return None
+        return await self.user_profile_manager.get_user_profile(user_id)
+    
+    async def get_user_analytics(self, user_id: str) -> Dict[str, Any]:
+        """Get user analytics and insights"""
+        if not self.user_profile_manager:
+            return {}
+        return await self.user_profile_manager.get_user_analytics(user_id)
+    
+    async def get_conversation_history(
+        self,
+        user_id: str,
+        limit: int = 50,
+        days_back: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Get user conversation history"""
+        if not self.user_profile_manager:
+            return []
+        return await self.user_profile_manager.get_conversation_history(
+            user_id, limit, days_back
+        )
+    
+    async def search_users_by_criteria(
+        self,
+        criteria: Dict[str, Any],
+        limit: int = 100
+    ) -> List[Any]:
+        """Search users by profile criteria"""
+        if not self.user_profile_manager:
+            return []
+        return await self.user_profile_manager.search_users(criteria, limit)
 
 
 # Export the main class

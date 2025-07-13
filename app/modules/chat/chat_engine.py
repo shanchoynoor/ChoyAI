@@ -321,10 +321,11 @@ class ChatEngine:
         return TaskType.CONVERSATION
     
     def _build_system_prompt(self, context: Dict[str, Any], persona: Any) -> str:
-        """Build comprehensive system prompt"""
+        """Build comprehensive system prompt with user profile"""
         
         user_ctx = context["user_context"]
         memories = context["memories"]
+        user_profile = context.get("user_profile")
         
         prompt = f"""
 {persona.system_prompt}
@@ -334,16 +335,52 @@ CURRENT USER CONTEXT:
 - Username: @{user_ctx['username'] or 'Not provided'}
 - Bio: {user_ctx['bio']}
 - Member since: {user_ctx['member_since']}
-- Preferred persona: {user_ctx['preferred_persona']}
+- Preferred persona: {user_ctx['preferred_persona']}"""
 
-IMPORTANT MEMORIES ABOUT THIS USER:
-"""
+        # Add detailed user profile information if available
+        if user_profile:
+            prompt += f"""
+
+DETAILED USER PROFILE:
+- Full Name: {user_profile.name or 'Not provided'}
+- Age: {user_profile.age or 'Not provided'}
+- Location: {user_profile.city or 'Not provided'}{', ' + user_profile.country if user_profile.country else ''}
+- Profession: {user_profile.profession or 'Not provided'}
+- Education: {user_profile.education or 'Not provided'}
+- Relationship Status: {user_profile.relationship_status or 'Not provided'}
+- Communication Style: {user_profile.communication_style or 'Not analyzed yet'}"""
+
+            if user_profile.interests:
+                prompt += f"\n- Interests: {', '.join(user_profile.interests)}"
+            
+            if user_profile.personality_traits:
+                prompt += f"\n- Personality Traits: {', '.join(user_profile.personality_traits)}"
+                
+            if user_profile.goals:
+                prompt += f"\n- Goals: {', '.join(user_profile.goals)}"
+                
+            if user_profile.background:
+                prompt += f"\n- Background: {user_profile.background}"
+
+        prompt += f"""
+
+IMPORTANT MEMORIES ABOUT THIS USER:"""
         
         if memories:
             for memory in memories:
-                prompt += f"- {memory}\n"
+                prompt += f"\n- {memory}"
         else:
-            prompt += "- No specific memories stored yet\n"
+            prompt += "\n- No specific memories stored yet"
+        
+        # Add recent extraction insights
+        extracted_info = context.get("extracted_info", {})
+        if extracted_info:
+            prompt += f"\n\nRECENTLY DISCOVERED INFORMATION:"
+            for field, value in extracted_info.items():
+                if isinstance(value, list):
+                    prompt += f"\n- {field.title()}: {', '.join(value)}"
+                else:
+                    prompt += f"\n- {field.title()}: {value}"
         
         prompt += f"""
 
