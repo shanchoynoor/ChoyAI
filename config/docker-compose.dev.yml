@@ -3,8 +3,8 @@ version: '3.8'
 services:
   choyai-dev:
     build: 
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: config/Dockerfile
       target: builder
     image: choyai-brain:dev
     container_name: choyai-brain-dev

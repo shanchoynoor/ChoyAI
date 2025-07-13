@@ -20,54 +20,54 @@ help: ## Show this help message
 # Development commands
 dev-build: ## Build development image
 	@echo "🔨 Building development image..."
-	docker-compose -f docker-compose.dev.yml build
+	docker-compose -f config/docker-compose.dev.yml build
 
 dev-run: ## Run in development mode with live reload
 	@echo "🚀 Starting ChoyAI Brain in development mode..."
-	docker-compose -f docker-compose.dev.yml up -d
+	docker-compose -f config/docker-compose.dev.yml up -d
 	@echo "✅ Development server running at http://localhost:8000"
 	@echo "📊 View logs with: make dev-logs"
 
 dev-stop: ## Stop development containers
 	@echo "🛑 Stopping development containers..."
-	docker-compose -f docker-compose.dev.yml down
+	docker-compose -f config/docker-compose.dev.yml down
 
 dev-logs: ## Show development logs (follow)
-	docker-compose -f docker-compose.dev.yml logs -f
+	docker-compose -f config/docker-compose.dev.yml logs -f
 
 dev-shell: ## Open shell in development container
-	docker-compose -f docker-compose.dev.yml exec choyai-dev /bin/bash
+	docker-compose -f config/docker-compose.dev.yml exec choyai-dev /bin/bash
 
 # Production commands
 build: ## Build production image
 	@echo "🔨 Building production image..."
-	docker-compose build --no-cache
+	docker-compose -f config/docker-compose.yml build --no-cache
 
 run: ## Run in production mode
 	@echo "🚀 Starting ChoyAI Brain in production mode..."
-	docker-compose up -d
+	docker-compose -f config/docker-compose.yml up -d
 	@echo "✅ Production server started"
 	@echo "📊 View logs with: make logs"
 
 stop: ## Stop all containers
 	@echo "🛑 Stopping all containers..."
-	docker-compose down
+	docker-compose -f config/docker-compose.yml down
 
 restart: ## Restart all services
 	@echo "🔄 Restarting services..."
-	docker-compose restart
+	docker-compose -f config/docker-compose.yml restart
 
 logs: ## Show logs (follow)
-	docker-compose logs -f choyai
+	docker-compose -f config/docker-compose.yml logs -f choyai
 
 logs-all: ## Show all service logs
-	docker-compose logs -f
+	docker-compose -f config/docker-compose.yml logs -f
 
 # Database and data management
 backup: ## Create database backup
 	@echo "💾 Creating backup..."
 	@mkdir -p $(BACKUP_DIR)
-	docker-compose exec choyai tar -czf /tmp/choyai_backup_$(TIMESTAMP).tar.gz /app/data
+	docker-compose -f config/docker-compose.yml exec choyai tar -czf /tmp/choyai_backup_$(TIMESTAMP).tar.gz /app/data
 	docker cp $(CONTAINER_NAME):/tmp/choyai_backup_$(TIMESTAMP).tar.gz $(BACKUP_DIR)/
 	@echo "✅ Backup created: $(BACKUP_DIR)/choyai_backup_$(TIMESTAMP).tar.gz"
 
@@ -78,12 +78,12 @@ restore: ## Restore from backup (usage: make restore BACKUP=filename)
 	fi
 	@echo "♻️ Restoring from backup: $(BACKUP)"
 	docker cp $(BACKUP_DIR)/$(BACKUP) $(CONTAINER_NAME):/tmp/restore.tar.gz
-	docker-compose exec choyai tar -xzf /tmp/restore.tar.gz -C /
+	docker-compose -f config/docker-compose.yml exec choyai tar -xzf /tmp/restore.tar.gz -C /
 	@echo "✅ Backup restored"
 
 init-db: ## Initialize database with schema
 	@echo "🗄️ Initializing database..."
-	docker-compose exec choyai python init_db.py
+	docker-compose -f config/docker-compose.yml exec choyai python tools/init_db.py
 	@echo "✅ Database initialized"
 
 # Maintenance commands
@@ -115,18 +115,18 @@ status: ## Show container status
 
 health: ## Check health status
 	@echo "🏥 Health Check:"
-	docker-compose exec choyai curl -f http://localhost:8000/health || echo "❌ Health check failed"
+	docker-compose -f config/docker-compose.yml exec choyai curl -f http://localhost:8000/health || echo "❌ Health check failed"
 
 stats: ## Show container resource usage
 	docker stats $(CONTAINER_NAME) --no-stream
 
 shell: ## Open shell in production container
-	docker-compose exec choyai /bin/bash
+	docker-compose -f config/docker-compose.yml exec choyai /bin/bash
 
 # Testing
 test: ## Run tests
 	@echo "🧪 Running tests..."
-	docker-compose exec choyai python -m pytest tests/ -v
+	docker-compose -f config/docker-compose.yml exec choyai python -m pytest tests/ -v
 
 test-build: ## Build and test
 	make build
@@ -252,4 +252,4 @@ force-rebuild: ## Force rebuild without cache and restart
 
 check-imports: ## Check if TaskType is properly exported
 	@echo "🔍 Checking TaskType import..."
-	docker-compose exec choyai python -c "from app.core.ai_providers import TaskType; print('✅ TaskType import successful')" || echo "❌ TaskType import failed"
+	docker-compose -f config/docker-compose.yml exec choyai python -c "from app.core.ai_providers import TaskType; print('✅ TaskType import successful')" || echo "❌ TaskType import failed"

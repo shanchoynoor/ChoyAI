@@ -110,36 +110,57 @@ class TelegramBotHandler:
     async def process_onboarding_answer(self, user_id: str, message: str, question_type: str) -> bool:
         """Process user's answer to onboarding question"""
         try:
+            message = message.strip()
+            
+            # Validate message is not empty
+            if not message:
+                return False
+            
             # Extract information based on question type
             if question_type == "city":
-                # Extract city/location information
+                # Accept any non-empty string as city
                 await self.ai_engine.user_profile_manager.update_user_info(
                     user_id=user_id,
-                    city=message.strip(),
+                    city=message,
                     platform="telegram"
                 )
+                return True
+                
             elif question_type == "age":
-                # Extract age information
+                # Extract age information - be more flexible
                 age_str = ''.join(filter(str.isdigit, message))
                 if age_str:
-                    await self.ai_engine.user_profile_manager.update_user_info(
-                        user_id=user_id,
-                        age=int(age_str),
-                        platform="telegram"
-                    )
-            elif question_type == "profession":
-                # Extract profession information
+                    age = int(age_str)
+                    if 1 <= age <= 150:  # Reasonable age range
+                        await self.ai_engine.user_profile_manager.update_user_info(
+                            user_id=user_id,
+                            age=age,
+                            platform="telegram"
+                        )
+                        return True
+                # If no valid age found, still accept the raw message
                 await self.ai_engine.user_profile_manager.update_user_info(
                     user_id=user_id,
-                    profession=message.strip(),
+                    age=None,  # Store as None, but mark as answered
                     platform="telegram"
                 )
+                return True
+                
+            elif question_type == "profession":
+                # Accept any non-empty string as profession
+                await self.ai_engine.user_profile_manager.update_user_info(
+                    user_id=user_id,
+                    profession=message,
+                    platform="telegram"
+                )
+                return True
             
-            return True
+            return False
             
         except Exception as e:
             self.logger.error(f"Error processing onboarding answer: {e}")
-            return False
+            # Even if there's an error, we should try to continue the onboarding
+            return True
     
     async def initialize(self):
         """Initialize the Telegram bot"""
@@ -276,7 +297,7 @@ class TelegramBotHandler:
             welcome_msg = f"""
 {greeting_msg}
 
-🧠 **Welcome to Choy AI Brain!**
+� **Welcome to Choy AI!**
 
 I'm your intelligent personal assistant with long-term memory and multiple personalities. Before we start chatting, I'd love to get to know you better!
 
@@ -297,7 +318,7 @@ Let me ask you a few quick questions to personalize our conversations:
             welcome_msg = f"""
 {greeting_msg}
 
-🧠 **Welcome back to Choy AI Brain!**
+� **Welcome back to Choy AI!**
 
 I'm your intelligent personal assistant with long-term memory and multiple personalities.
 
@@ -333,7 +354,7 @@ Just start chatting with me naturally! I'll remember our conversations and provi
         
         if not onboarding_status["completed"]:
             help_msg = """
-🧠 **Choy AI Brain - Getting Started**
+� **Choy AI - Getting Started**
 
 Hi! I noticed you haven't completed the initial setup yet. 
 
@@ -346,7 +367,7 @@ This helps me provide more personalized assistance! After that, you'll have acce
 """
         else:
             help_msg = """
-🧠 **Choy AI Brain - Help Guide**
+� **Choy AI - Help Guide**
 
 **Basic Usage:**
 Just chat with me naturally! I understand context and remember our conversations.
@@ -676,10 +697,11 @@ Before we continue chatting, I'd love to get to know you better!
             onboarding_state = self.user_onboarding_state[user_id]
             current_question = onboarding_state["next_question"]
             
-            # Process the answer
+            # Process the answer - always try to accept it
             success = await self.process_onboarding_answer(user_id, message, current_question)
             
-            if success:
+            # Always move forward unless there's a critical error
+            if success or len(message.strip()) > 0:
                 # Update questions answered count
                 onboarding_state["questions_answered"] += 1
                 
@@ -700,11 +722,10 @@ Before we continue chatting, I'd love to get to know you better!
                     
                 else:
                     # Onboarding complete
-                    time_greeting = self.get_time_based_greeting()
                     response = f"""
 Perfect! Thank you for sharing those details with me. 🎉
 
-Now I can provide you with more personalized assistance! I'm ChoyAI, and by default, I have a confident, strategic, and direct personality. 
+Now I can provide you with more personalized assistance! I'm Choy AI, and by default, I have a confident, strategic, and direct personality. 
 
 You can switch to different personalities anytime:
 • `/persona stark` - Tech genius, sarcastic, innovative
@@ -718,7 +739,8 @@ What would you like to chat about, {user.first_name}? I'm here to help with anyt
                     self.user_onboarding_state[user_id]["active"] = False
                 
             else:
-                response = "I didn't quite catch that. Could you please try again?"
+                # Only show error if message is completely empty
+                response = "I didn't quite understand your answer. Could you please provide that information again?"
             
             await update.message.reply_text(response, parse_mode='Markdown')
             
