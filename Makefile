@@ -49,6 +49,9 @@ run: ## Run in production mode
 	@echo "✅ Production server started"
 	@echo "📊 View logs with: make logs"
 
+start: ## Alias for run command
+	@make run
+
 stop: ## Stop all containers
 	@echo "🛑 Stopping all containers..."
 	docker-compose -f config/docker-compose.yml down
@@ -162,6 +165,10 @@ quick-start: setup-env build run ## Quick start (setup + build + run)
 dev-start: setup-env dev-build dev-run ## Quick development start
 	@echo "🎉 ChoyAI Brain development environment is running!"
 
+quick-fix: ## Run automated fix for common deployment issues
+	@echo "🔧 Running ChoyAI Quick Fix..."
+	@bash deployment/quick-fix.sh
+
 # Security
 security-scan: ## Run security scan on image
 	@echo "🔒 Running security scan..."
@@ -245,11 +252,59 @@ restart-main: ## Restart only the main ChoyAI container
 
 force-rebuild: ## Force rebuild without cache and restart
 	@echo "🔄 Force rebuilding ChoyAI (no cache)..."
-	make stop
-	docker-compose build --no-cache --pull
+	make force-stop
+	docker-compose -f config/docker-compose.yml build --no-cache --pull
 	make run
 	@echo "✅ Force rebuild complete"
 
 check-imports: ## Check if TaskType is properly exported
 	@echo "🔍 Checking TaskType import..."
 	docker-compose -f config/docker-compose.yml exec choyai python -c "from app.core.ai_providers import TaskType; print('✅ TaskType import successful')" || echo "❌ TaskType import failed"
+
+# Container management
+force-stop: ## Force stop and remove all containers
+	@echo "💀 Force stopping and removing all containers..."
+	docker-compose -f config/docker-compose.yml down --volumes --remove-orphans
+	docker container rm -f choyai-brain choyai-redis choyai-postgres 2>/dev/null || true
+	@echo "✅ All containers force removed"
+
+clean-containers: ## Remove conflicting containers
+	@echo "🧹 Cleaning conflicting containers..."
+	@docker container rm -f choyai-brain choyai-redis choyai-postgres 2>/dev/null || echo "No conflicting containers found"
+	@echo "✅ Container cleanup complete"
+
+check-env: ## Check if .env file exists and has required variables
+	@echo "🔍 Checking environment configuration..."
+	@if [ ! -f .env ]; then \
+		echo "❌ .env file not found!"; \
+		echo "📝 Creating from template..."; \
+		cp config/.env.example .env; \
+		echo "✅ .env file created from template"; \
+		echo "⚠️  IMPORTANT: Please edit .env with your API keys before running!"; \
+		echo "📝 Required: TELEGRAM_BOT_TOKEN and DEEPSEEK_API_KEY"; \
+		exit 1; \
+	fi
+	@if ! grep -q "TELEGRAM_BOT_TOKEN=" .env || ! grep -q "DEEPSEEK_API_KEY=" .env; then \
+		echo "⚠️  .env file exists but may be missing required variables"; \
+		echo "📝 Required: TELEGRAM_BOT_TOKEN and DEEPSEEK_API_KEY"; \
+	else \
+		echo "✅ Environment configuration looks good"; \
+	fi
+
+# Enhanced deployment commands
+safe-restart: ## Safe restart - stop, clean, and start
+	@echo "🔄 Performing safe restart..."
+	@make force-stop
+	@make clean-containers
+	@make check-env
+	@make run
+	@echo "✅ Safe restart complete"
+
+deploy-fresh: ## Fresh deployment - clean everything and deploy
+	@echo "🚀 Performing fresh deployment..."
+	@make force-stop
+	@make clean-containers  
+	@make check-env
+	@make build
+	@make run
+	@echo "✅ Fresh deployment complete"
