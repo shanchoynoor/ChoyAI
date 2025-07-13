@@ -8,6 +8,35 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
+• `/start` - Welcome message and overview
+• `/help` - This help guide
+• `/persona <n>` - Switch personality (choy, stark, rose)
+• `/personas` - List all available personalities
+• `/remember <key> <value> [context]` - Save memory
+• `/recall <key>` - Get specific memory
+• `/memories` - List all memories
+• `/forget <key>` - Delete a memory
+• `/bio <text>` - Set your biography
+• `/history [limit]` - View conversation history
+• `/stats` - View AI performance statistics
+• `/myid` - Show your user information
+
+**AI Provider Commands:**
+• `/providers` - Show available AI providers and status
+• `/switchai <task> <provider>` - Switch AI provider for tasks
+• `/aitask <task> <message>` - Force specific task type
+
+**Available Task Types:**
+• `conversation` - General chat
+• `technical` - Programming and tech questions
+• `creative` - Writing and creative tasks
+• `analysis` - Deep analysis and research
+• `research` - Information gathering
+• `coding` - Code generation
+• `problem` - Problem solving
+• `emotional` - Emotional support
+• `summary` - Summarization tasks
+• `translate` - Translation tasksime
 
 from telegram import Update, Bot
 from telegram.ext import (
@@ -78,6 +107,11 @@ class TelegramBotHandler:
         app.add_handler(CommandHandler("myid", self.handle_myid))
         app.add_handler(CommandHandler("stats", self.handle_stats))
         app.add_handler(CommandHandler("history", self.handle_history))
+        
+        # AI Provider commands
+        app.add_handler(CommandHandler("providers", self.handle_providers))
+        app.add_handler(CommandHandler("switchai", self.handle_switch_ai))
+        app.add_handler(CommandHandler("aitask", self.handle_ai_task))
         
         # Message handler (for regular chat)
         app.add_handler(
@@ -520,7 +554,191 @@ Need help with something specific? Just ask me!
                 )
             except TelegramError:
                 pass  # Don't fail on error handling
-
+    
+    async def handle_providers(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show available AI providers and their status"""
+        user_id = str(update.effective_user.id)
+        
+        # Validate user
+        if not user_validator(user_id):
+            await update.message.reply_text("❌ Access denied")
+            return
+            
+        try:
+            provider_status = await self.ai_engine.get_ai_provider_status()
+            
+            message = "🤖 *AI Provider Status*\n\n"
+            
+            for provider_name, status in provider_status.items():
+                if status.get('healthy', False):
+                    status_icon = "✅"
+                    models = status.get('models', [])
+                    supported_tasks = status.get('supported_tasks', [])
+                    
+                    message += f"{status_icon} *{provider_name.title()}*\n"
+                    message += f"   Models: {', '.join(models[:3])}{'...' if len(models) > 3 else ''}\n"
+                    message += f"   Tasks: {len(supported_tasks)} supported\n"
+                    
+                    metrics = status.get('metrics', {})
+                    if metrics:
+                        success_count = metrics.get('success_count', 0)
+                        error_count = metrics.get('error_count', 0)
+                        total = success_count + error_count
+                        if total > 0:
+                            success_rate = (success_count / total) * 100
+                            message += f"   Success Rate: {success_rate:.1f}%\n"
+                else:
+                    status_icon = "❌"
+                    error = status.get('error', 'Unknown error')
+                    message += f"{status_icon} *{provider_name.title()}*\n"
+                    message += f"   Error: {error}\n"
+                    
+                message += "\n"
+            
+            message += "\n💡 Use `/switchai <task> <provider>` to change providers"
+            message += "\n📝 Use `/aitask <task> <message>` to force a specific task type"
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+            
+        except Exception as e:
+            self.logger.error(f"Error getting provider status: {e}")
+            await update.message.reply_text("❌ Error retrieving provider status")
+    
+    async def handle_switch_ai(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Switch AI provider for a specific task type"""
+        user_id = str(update.effective_user.id)
+        
+        # Validate user
+        if not user_validator(user_id):
+            await update.message.reply_text("❌ Access denied")
+            return
+        
+        if len(context.args) != 2:
+            await update.message.reply_text(
+                "Usage: `/switchai <task_type> <provider>`\n\n"
+                "Task types: conversation, technical, creative, analysis, research, etc.\n"
+                "Providers: deepseek, openai, anthropic, xai, gemini"
+            )
+            return
+            
+        task_type_name = context.args[0].lower()
+        provider_name = context.args[1].lower()
+        
+        try:
+            from app.core.ai_providers import TaskType
+            
+            # Map string to TaskType enum
+            task_type_map = {
+                'conversation': TaskType.CONVERSATION,
+                'technical': TaskType.TECHNICAL,
+                'creative': TaskType.CREATIVE,
+                'analysis': TaskType.ANALYSIS,
+                'research': TaskType.RESEARCH,
+                'coding': TaskType.CODE_GENERATION,
+                'code': TaskType.CODE_GENERATION,
+                'problem': TaskType.PROBLEM_SOLVING,
+                'emotional': TaskType.EMOTIONAL_SUPPORT,
+                'summary': TaskType.SUMMARIZATION,
+                'translate': TaskType.TRANSLATION
+            }
+            
+            task_type = task_type_map.get(task_type_name)
+            if not task_type:
+                await update.message.reply_text(
+                    f"❌ Unknown task type: {task_type_name}\n"
+                    f"Available: {', '.join(task_type_map.keys())}"
+                )
+                return
+            
+            success = await self.ai_engine.switch_ai_provider(task_type, provider_name)
+            
+            if success:
+                await update.message.reply_text(
+                    f"✅ Switched {task_type_name} tasks to {provider_name.title()}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ Failed to switch to {provider_name}. Provider may not be available."
+                )
+                
+        except Exception as e:
+            self.logger.error(f"Error switching provider: {e}")
+            await update.message.reply_text("❌ Error switching AI provider")
+    
+    async def handle_ai_task(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Process message with specific task type"""
+        user_id = str(update.effective_user.id)
+        
+        # Apply rate limiting
+        if not rate_limiter(user_id):
+            await update.message.reply_text("⏰ Please wait before sending another message")
+            return
+            
+        # Validate user
+        if not user_validator(user_id):
+            await update.message.reply_text("❌ Access denied")
+            return
+        
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "Usage: `/aitask <task_type> <your message>`\n\n"
+                "Examples:\n"
+                "• `/aitask creative Write me a short story`\n"
+                "• `/aitask technical Explain how async works in Python`\n"
+                "• `/aitask analysis Compare these two approaches`"
+            )
+            return
+            
+        task_type_name = context.args[0].lower()
+        message = " ".join(context.args[1:])
+        
+        try:
+            from app.core.ai_providers import TaskType
+            
+            # Map string to TaskType enum
+            task_type_map = {
+                'conversation': TaskType.CONVERSATION,
+                'technical': TaskType.TECHNICAL,
+                'creative': TaskType.CREATIVE,
+                'analysis': TaskType.ANALYSIS,
+                'research': TaskType.RESEARCH,
+                'coding': TaskType.CODE_GENERATION,
+                'code': TaskType.CODE_GENERATION,
+                'problem': TaskType.PROBLEM_SOLVING,
+                'emotional': TaskType.EMOTIONAL_SUPPORT,
+                'summary': TaskType.SUMMARIZATION,
+                'translate': TaskType.TRANSLATION
+            }
+            
+            task_type = task_type_map.get(task_type_name)
+            if not task_type:
+                await update.message.reply_text(
+                    f"❌ Unknown task type: {task_type_name}\n"
+                    f"Available: {', '.join(task_type_map.keys())}"
+                )
+                return
+            
+            # Process message with specific task type
+            response = await self.ai_engine.process_message_with_provider(
+                user_id=user_id,
+                message=message,
+                task_type=task_type,
+                platform="telegram",
+                context={
+                    'username': update.effective_user.username,
+                    'first_name': update.effective_user.first_name,
+                    'chat_id': update.effective_chat.id,
+                    'forced_task_type': task_type_name
+                }
+            )
+            
+            # Send response with task type indicator
+            response_with_header = f"🎯 *{task_type_name.title()} Task*\n\n{response}"
+            await update.message.reply_text(response_with_header, parse_mode='Markdown')
+            
+        except Exception as e:
+            self.logger.error(f"Error processing AI task: {e}")
+            await update.message.reply_text("❌ Error processing your task request")
 
 # Export the main class
 __all__ = ["TelegramBotHandler"]

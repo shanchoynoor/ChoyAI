@@ -13,7 +13,7 @@ from app.modules.memory.core_memory import CoreMemoryManager
 from app.modules.memory.user_memory import UserMemoryManager
 from app.modules.memory.conversation_memory import ConversationMemoryManager
 from app.modules.personas.persona_manager import PersonaManager
-from app.utils.deepseek_api import DeepSeekAPI
+from app.core.ai_providers import AIProviderManager, AIMessage, TaskType
 from app.config.settings import settings
 
 
@@ -25,7 +25,8 @@ class ChatEngine:
         core_memory: CoreMemoryManager,
         user_memory: UserMemoryManager,
         conversation_memory: ConversationMemoryManager,
-        persona_manager: PersonaManager
+        persona_manager: PersonaManager,
+        ai_provider_manager: Optional[AIProviderManager] = None
     ):
         self.logger = logging.getLogger(__name__)
         
@@ -35,8 +36,8 @@ class ChatEngine:
         self.conversation_memory = conversation_memory
         self.persona_manager = persona_manager
         
-        # AI API
-        self.deepseek_api: Optional[DeepSeekAPI] = None
+        # AI Provider Manager
+        self.ai_provider_manager = ai_provider_manager
         
         # Active conversations cache
         self.active_conversations: Dict[str, int] = {}
@@ -46,8 +47,12 @@ class ChatEngine:
         self.logger.info("💭 Initializing Chat Engine...")
         
         try:
-            # Initialize DeepSeek API
-            self.deepseek_api = DeepSeekAPI()
+            # AI Provider Manager should be initialized externally
+            if not self.ai_provider_manager:
+                self.logger.warning("No AI Provider Manager provided - creating default")
+                from app.core.ai_providers import AIProviderManager
+                self.ai_provider_manager = AIProviderManager()
+                await self.ai_provider_manager.initialize()
             
             self.logger.info("✅ Chat Engine initialized")
             
@@ -232,39 +237,88 @@ class ChatEngine:
         system_prompt = self._build_system_prompt(context, persona)
         
         # Prepare conversation history for API
-        messages = [{"role": "system", "content": system_prompt}]
+        # Convert to AIMessage format for provider system
+        ai_messages = []
+        ai_messages.append(AIMessage(role="system", content=system_prompt))
         
         # Add recent conversation context
         for msg_text in context["recent_conversation"][-5:]:  # Last 5 messages
             if msg_text.startswith("User: "):
-                messages.append({"role": "user", "content": msg_text[6:]})
+                ai_messages.append(AIMessage(role="user", content=msg_text[6:]))
             elif msg_text.startswith("AI: "):
-                messages.append({"role": "assistant", "content": msg_text[4:]})
+                ai_messages.append(AIMessage(role="assistant", content=msg_text[4:]))
         
         # Add current message
-        messages.append({"role": "user", "content": user_message})
-        
+        ai_messages.append(AIMessage(role="user", content=user_message))
+
         try:
-            # Generate response
-            response = await self.deepseek_api.chat_completion(
-                messages=messages,
+            # Determine task type based on message content and persona
+            task_type = self._determine_task_type(user_message, persona)
+            
+            # Generate response using AI Provider Manager
+            response = await self.ai_provider_manager.chat_completion(
+                messages=ai_messages,
+                task_type=task_type,
                 temperature=persona.response_style.get("temperature", 0.7),
-                max_tokens=min(settings.max_response_length, settings.deepseek_max_tokens)
+                max_tokens=min(settings.max_response_length, 4000)
             )
             
-            if 'choices' in response and len(response['choices']) > 0:
-                ai_response = response['choices'][0]['message']['content'].strip()
+            if response.content:
+                ai_response = response.content.strip()
                 
                 # Apply persona-specific post-processing
                 ai_response = self._apply_persona_style(ai_response, persona)
                 
+                # Log which provider was used
+                self.logger.info(f"Response generated using {response.provider} ({response.model})")
+                
                 return ai_response
             else:
-                raise Exception("No response content in API result")
+                error_msg = response.error or "No response content generated"
+                raise Exception(error_msg)
         
         except Exception as e:
             self.logger.error(f"❌ Error generating AI response: {e}")
             return f"I apologize, but I'm having trouble generating a response right now. Please try again."
+    
+    def _determine_task_type(self, message: str, persona: Any) -> TaskType:
+        """Determine the appropriate task type based on message content and persona"""
+        message_lower = message.lower()
+        
+        # Emotional support keywords
+        if any(word in message_lower for word in ["sad", "depressed", "anxious", "worried", "upset", "feel", "emotion"]):
+            return TaskType.EMOTIONAL_SUPPORT
+        
+        # Technical/coding keywords
+        if any(word in message_lower for word in ["code", "programming", "function", "algorithm", "debug", "error", "python", "javascript"]):
+            return TaskType.TECHNICAL
+            
+        # Creative writing keywords
+        if any(word in message_lower for word in ["story", "write", "creative", "poem", "fiction", "character"]):
+            return TaskType.CREATIVE
+            
+        # Analysis keywords
+        if any(word in message_lower for word in ["analyze", "analysis", "compare", "evaluate", "review", "assess"]):
+            return TaskType.ANALYSIS
+            
+        # Research keywords
+        if any(word in message_lower for word in ["research", "information", "fact", "explain", "learn", "study"]):
+            return TaskType.RESEARCH
+            
+        # Problem solving keywords
+        if any(word in message_lower for word in ["problem", "solve", "solution", "help", "fix", "issue"]):
+            return TaskType.PROBLEM_SOLVING
+            
+        # Summarization keywords
+        if any(word in message_lower for word in ["summarize", "summary", "brief", "overview", "tldr"]):
+            return TaskType.SUMMARIZATION
+            
+        # Translation keywords
+        if any(word in message_lower for word in ["translate", "translation", "language"]):
+            return TaskType.TRANSLATION
+        
+        # Default to conversation
+        return TaskType.CONVERSATION
     
     def _build_system_prompt(self, context: Dict[str, Any], persona: Any) -> str:
         """Build comprehensive system prompt"""

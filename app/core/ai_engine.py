@@ -19,7 +19,7 @@ from app.modules.memory.user_memory import UserMemoryManager
 from app.modules.memory.conversation_memory import ConversationMemoryManager
 from app.modules.personas.persona_manager import PersonaManager
 from app.modules.chat.chat_engine import ChatEngine
-from app.utils.deepseek_api import DeepSeekAPI
+from app.core.ai_providers import AIProviderManager, AIMessage, TaskType
 from app.config.settings import settings
 
 
@@ -48,7 +48,7 @@ class ChoyAIEngine:
         self.conversation_memory: Optional[ConversationMemoryManager] = None
         self.persona_manager: Optional[PersonaManager] = None
         self.chat_engine: Optional[ChatEngine] = None
-        self.deepseek_api: Optional[DeepSeekAPI] = None
+        self.ai_provider_manager: Optional[AIProviderManager] = None
         
         # Active conversations
         self.active_conversations: Dict[str, ConversationContext] = {}
@@ -77,17 +77,19 @@ class ChoyAIEngine:
             self.persona_manager = PersonaManager()
             await self.persona_manager.initialize()
             
-            # Initialize chat engine
+            # Initialize AI Provider Manager
+            self.ai_provider_manager = AIProviderManager()
+            await self.ai_provider_manager.initialize()
+            
+            # Initialize chat engine with AI provider manager
             self.chat_engine = ChatEngine(
                 core_memory=self.core_memory,
                 user_memory=self.user_memory,
                 conversation_memory=self.conversation_memory,
-                persona_manager=self.persona_manager
+                persona_manager=self.persona_manager,
+                ai_provider_manager=self.ai_provider_manager
             )
             await self.chat_engine.initialize()
-            
-            # Initialize DeepSeek API
-            self.deepseek_api = DeepSeekAPI()
             
             self.logger.info("✅ AI Engine initialized successfully")
             
@@ -283,6 +285,77 @@ class ChoyAIEngine:
             }
         }
     
+    async def switch_ai_provider(self, task_type: TaskType, provider_name: str) -> bool:
+        """
+        Switch the primary AI provider for a specific task type
+        
+        Args:
+            task_type: The task type to configure
+            provider_name: Name of the provider to use
+            
+        Returns:
+            True if switch was successful
+        """
+        try:
+            if not self.ai_provider_manager:
+                self.logger.error("AI Provider Manager not initialized")
+                return False
+                
+            await self.ai_provider_manager.switch_primary_provider(task_type, provider_name)
+            self.logger.info(f"Switched {task_type.value} provider to {provider_name}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to switch provider: {e}")
+            return False
+    
+    async def get_ai_provider_status(self) -> Dict[str, Any]:
+        """Get status of all AI providers"""
+        if not self.ai_provider_manager:
+            return {"error": "AI Provider Manager not initialized"}
+            
+        return await self.ai_provider_manager.get_provider_status()
+    
+    async def process_message_with_provider(
+        self,
+        user_id: str,
+        message: str,
+        task_type: TaskType = TaskType.CONVERSATION,
+        preferred_provider: Optional[str] = None,
+        platform: str = "telegram",
+        persona: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Process a message with specific task type and optional provider preference
+        
+        Args:
+            user_id: Unique user identifier
+            message: User message text
+            task_type: Type of task for AI provider selection
+            preferred_provider: Force use of specific provider
+            platform: Platform source
+            persona: Requested persona
+            context: Additional context data
+            
+        Returns:
+            Generated AI response
+        """
+        # Use existing process_message but with enhanced context
+        enhanced_context = context or {}
+        enhanced_context.update({
+            "task_type": task_type,
+            "preferred_provider": preferred_provider
+        })
+        
+        return await self.process_message(
+            user_id=user_id,
+            message=message,
+            platform=platform,
+            persona=persona,
+            context=enhanced_context
+        )
+
     async def _get_conversation_context(
         self,
         conversation_id: str,

@@ -12,6 +12,12 @@ Choy AI Brain is the central intelligence hub designed to be the core AI system 
 - **Context Awareness**: Maintains conversation context across sessions
 - **Strategic Thinking**: AI that remembers and builds upon previous interactions
 
+### 🤖 **Multi-Provider AI System**
+- **Provider Management**: Support for multiple AI providers with automatic failover
+- **Task-Specific Routing**: Different providers optimized for different task types
+- **Performance Monitoring**: Real-time provider health checking and metrics
+- **Flexible Configuration**: Easy switching between providers based on preferences
+
 ### 💬 **Communication**
 - **Telegram Bot**: Full-featured Telegram integration
 - **Natural Conversations**: Context-aware responses that reference past interactions
@@ -37,7 +43,12 @@ Choy AI Brain is the central intelligence hub designed to be the core AI system 
 ### Prerequisites
 - Python 3.11+
 - Telegram Bot Token (from @BotFather)
-- DeepSeek API Key
+- At least one AI API Key:
+  - **DeepSeek API Key** (Primary, recommended)
+  - **OpenAI API Key** (Optional, for ChatGPT)
+  - **Anthropic API Key** (Optional, for Claude)
+  - **xAI API Key** (Optional, for Grok)
+  - **Google AI API Key** (Optional, for Gemini)
 
 ### Installation
 
@@ -106,6 +117,29 @@ Personas are defined in YAML files in the `data/personas/` directory. Each perso
 | `/bio <text>` | Set biography | `/bio Software engineer` |
 | `/history` | View conversation history | `/history` |
 | `/stats` | View AI statistics | `/stats` |
+
+### AI Provider Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/providers` | Show available AI providers and status | `/providers` |
+| `/switchai <task> <provider>` | Switch AI provider for tasks | `/switchai creative openai` |
+| `/aitask <task> <message>` | Force specific task type | `/aitask technical Explain async Python` |
+
+### Available Task Types & Optimal Providers
+
+| Task Type | Best For | Optimal Provider | Fallback |
+|-----------|----------|------------------|----------|
+| `conversation` | General chat | DeepSeek | OpenAI, Claude |
+| `technical` | Programming questions | DeepSeek | OpenAI, xAI |
+| `creative` | Writing, storytelling | OpenAI | Claude, DeepSeek |
+| `analysis` | Deep analysis, research | Claude | OpenAI, DeepSeek |
+| `research` | Information gathering | Gemini | Claude, OpenAI |
+| `coding` | Code generation | DeepSeek | OpenAI, Claude |
+| `problem` | Problem solving | OpenAI | Claude, DeepSeek |
+| `emotional` | Emotional support | Claude | OpenAI, DeepSeek |
+| `summary` | Summarization | Claude | Gemini, OpenAI |
+| `translate` | Translation | Gemini | OpenAI, Claude |
 
 ### Natural Conversation
 

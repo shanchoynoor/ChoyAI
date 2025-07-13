@@ -324,6 +324,108 @@ class Settings(BaseSettings):
         description="Health check interval in seconds"
     )
     
+    # ===== AI PROVIDER APIS =====
+    
+    # OpenAI/ChatGPT
+    openai_api_key: Optional[SecretStr] = Field(
+        default=None,
+        env="OPENAI_API_KEY",
+        description="OpenAI API key for ChatGPT"
+    )
+    
+    openai_model: str = Field(
+        default="gpt-4",
+        env="OPENAI_MODEL",
+        description="OpenAI model to use"
+    )
+    
+    openai_max_tokens: int = Field(
+        default=4000,
+        env="OPENAI_MAX_TOKENS",
+        description="Maximum tokens for OpenAI responses"
+    )
+    
+    openai_temperature: float = Field(
+        default=0.7,
+        env="OPENAI_TEMPERATURE",
+        description="Temperature for OpenAI responses"
+    )
+    
+    # Anthropic Claude
+    anthropic_api_key: Optional[SecretStr] = Field(
+        default=None,
+        env="ANTHROPIC_API_KEY",
+        description="Anthropic API key for Claude"
+    )
+    
+    anthropic_model: str = Field(
+        default="claude-3-sonnet-20240229",
+        env="ANTHROPIC_MODEL",
+        description="Anthropic model to use"
+    )
+    
+    anthropic_max_tokens: int = Field(
+        default=4000,
+        env="ANTHROPIC_MAX_TOKENS",
+        description="Maximum tokens for Anthropic responses"
+    )
+    
+    anthropic_temperature: float = Field(
+        default=0.7,
+        env="ANTHROPIC_TEMPERATURE",
+        description="Temperature for Anthropic responses"
+    )
+    
+    # xAI Grok
+    xai_api_key: Optional[SecretStr] = Field(
+        default=None,
+        env="XAI_API_KEY",
+        description="xAI API key for Grok"
+    )
+    
+    xai_model: str = Field(
+        default="grok-beta",
+        env="XAI_MODEL",
+        description="xAI model to use"
+    )
+    
+    xai_max_tokens: int = Field(
+        default=4000,
+        env="XAI_MAX_TOKENS",
+        description="Maximum tokens for xAI responses"
+    )
+    
+    xai_temperature: float = Field(
+        default=0.7,
+        env="XAI_TEMPERATURE",
+        description="Temperature for xAI responses"
+    )
+    
+    # Google Gemini
+    gemini_api_key: Optional[SecretStr] = Field(
+        default=None,
+        env="GEMINI_API_KEY",
+        description="Google Gemini API key"
+    )
+    
+    gemini_model: str = Field(
+        default="gemini-pro",
+        env="GEMINI_MODEL",
+        description="Gemini model to use"
+    )
+    
+    gemini_max_tokens: int = Field(
+        default=4000,
+        env="GEMINI_MAX_TOKENS",
+        description="Maximum tokens for Gemini responses"
+    )
+    
+    gemini_temperature: float = Field(
+        default=0.7,
+        env="GEMINI_TEMPERATURE",
+        description="Temperature for Gemini responses"
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
