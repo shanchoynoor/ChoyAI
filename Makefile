@@ -45,6 +45,7 @@ build: ## Build production image
 
 run: ## Run in production mode
 	@echo "🚀 Starting ChoyAI Brain in production mode..."
+	@make env-fix-location
 	docker-compose -f config/docker-compose.yml up -d
 	@echo "✅ Production server started"
 	@echo "📊 View logs with: make logs"
@@ -333,6 +334,7 @@ safe-restart: ## Safe restart - stop, clean, and start
 	@make force-stop
 	@make clean-containers
 	@make check-env
+	@make env-fix-location
 	@make run
 	@echo "✅ Safe restart complete"
 
@@ -341,9 +343,24 @@ deploy-fresh: ## Fresh deployment - clean everything and deploy
 	@make force-stop
 	@make clean-containers  
 	@make check-env
+	@make env-fix-location
 	@make build
 	@make run
 	@echo "✅ Fresh deployment complete"
+
+env-fix-location: ## Fix .env file location for Docker Compose
+	@echo "🔧 Fixing .env file location..."
+	@if [ -f .env ] && [ ! -f config/.env ]; then \
+		echo "📝 Copying .env to config/ directory..."; \
+		cp .env config/.env; \
+		echo "✅ .env file copied to config/.env"; \
+	elif [ -f .env ] && [ -f config/.env ]; then \
+		echo "🔄 Updating config/.env with latest .env..."; \
+		cp .env config/.env; \
+		echo "✅ config/.env updated"; \
+	else \
+		echo "⚠️  .env file not found in root directory"; \
+	fi
 
 env-debug: ## Run comprehensive environment debugging
 	@echo "🔍 Running environment diagnostics..."
