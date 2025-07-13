@@ -177,7 +177,22 @@ monitor: ## Monitor logs in real-time
 install-deps: ## Install system dependencies for VPS
 	@echo "📦 Installing system dependencies..."
 	sudo apt-get update
-	sudo apt-get install -y docker.io docker-compose curl git
+	@echo "🔍 Checking Docker installation..."
+	@if command -v docker >/dev/null 2>&1; then \
+		echo "✅ Docker already installed"; \
+		docker --version; \
+	else \
+		echo "📦 Installing Docker..."; \
+		sudo apt-get install -y docker.io; \
+	fi
+	@if command -v docker-compose >/dev/null 2>&1; then \
+		echo "✅ Docker Compose already installed"; \
+		docker-compose --version; \
+	else \
+		echo "📦 Installing Docker Compose..."; \
+		sudo apt-get install -y docker-compose; \
+	fi
+	sudo apt-get install -y curl git
 	sudo systemctl enable docker
 	sudo systemctl start docker
 	sudo usermod -aG docker admin
@@ -188,3 +203,12 @@ deploy-ssl: ## Deploy with SSL (nginx + certbot)
 	@echo "🔒 Deploying with SSL..."
 	docker-compose --profile webhook up -d
 	@echo "✅ SSL deployment complete"
+
+fix-docker: ## Fix Docker permissions and conflicts
+	@echo "🔧 Fixing Docker setup..."
+	sudo systemctl enable docker
+	sudo systemctl start docker
+	sudo usermod -aG docker admin
+	@echo "💡 Please log out and back in to apply Docker group changes"
+	@echo "🔍 Current Docker status:"
+	sudo systemctl status docker --no-pager -l
