@@ -212,3 +212,33 @@ fix-docker: ## Fix Docker permissions and conflicts
 	@echo "💡 Please log out and back in to apply Docker group changes"
 	@echo "🔍 Current Docker status:"
 	sudo systemctl status docker --no-pager -l
+
+# Debugging and troubleshooting
+debug: ## Show detailed container and error information
+	@echo "🔍 ChoyAI Debug Information"
+	@echo "=========================="
+	@echo ""
+	@echo "📊 Container Status:"
+	docker-compose ps
+	@echo ""
+	@echo "🔍 Main Container Logs (last 50 lines):"
+	docker-compose logs --tail=50 choyai
+	@echo ""
+	@echo "💾 Resource Usage:"
+	docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null || echo "No running containers"
+	@echo ""
+	@echo "🌐 Network Status:"
+	docker network ls | grep choyai || echo "No ChoyAI networks found"
+
+logs-error: ## Show only error logs from main container
+	@echo "❌ ChoyAI Error Logs:"
+	docker-compose logs choyai | grep -i error || echo "No error logs found"
+
+logs-tail: ## Show recent logs from main container
+	@echo "📋 Recent ChoyAI Logs:"
+	docker-compose logs --tail=20 choyai
+
+restart-main: ## Restart only the main ChoyAI container
+	@echo "🔄 Restarting ChoyAI main container..."
+	docker-compose restart choyai
+	@echo "✅ Main container restarted"
