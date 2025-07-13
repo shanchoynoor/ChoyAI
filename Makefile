@@ -282,14 +282,50 @@ check-env: ## Check if .env file exists and has required variables
 		echo "✅ .env file created from template"; \
 		echo "⚠️  IMPORTANT: Please edit .env with your API keys before running!"; \
 		echo "📝 Required: TELEGRAM_BOT_TOKEN and DEEPSEEK_API_KEY"; \
+		echo "💡 Edit with: nano .env"; \
+		exit 1; \
+	fi
+	@echo "✅ .env file exists"
+	@if grep -q "your_bot_token_here\|your_deepseek_key_here\|your_.*_here" .env; then \
+		echo "⚠️  WARNING: Placeholder values detected in .env file!"; \
+		echo "📝 Please replace placeholder values with real API keys"; \
+		echo "💡 Edit with: nano .env"; \
 		exit 1; \
 	fi
 	@if ! grep -q "TELEGRAM_BOT_TOKEN=" .env || ! grep -q "DEEPSEEK_API_KEY=" .env; then \
 		echo "⚠️  .env file exists but may be missing required variables"; \
 		echo "📝 Required: TELEGRAM_BOT_TOKEN and DEEPSEEK_API_KEY"; \
-	else \
-		echo "✅ Environment configuration looks good"; \
+		exit 1; \
 	fi
+	@echo "✅ Environment configuration looks good"
+
+show-env: ## Show current environment variables
+	@echo "🔍 Environment Variables Status:"
+	@echo "================================"
+	@if [ -f .env ]; then \
+		echo "✅ .env file exists"; \
+		echo "📄 .env file contents:"; \
+		echo ""; \
+		grep -E "(TELEGRAM_BOT_TOKEN|DEEPSEEK_API_KEY)" .env | sed 's/=.*/=***HIDDEN***/' || echo "⚠️  No API keys found in .env"; \
+		echo ""; \
+	else \
+		echo "❌ .env file not found"; \
+	fi
+	@echo "🔍 Docker Compose Environment:"
+	@docker-compose -f config/docker-compose.yml config | grep -E "(TELEGRAM_BOT_TOKEN|DEEPSEEK_API_KEY)" || echo "⚠️  Variables not detected by Docker Compose"
+
+fix-env: ## Fix environment variable issues
+	@echo "🔧 Fixing environment variables..."
+	@if [ ! -f .env ]; then \
+		echo "📝 Creating .env file..."; \
+		cp config/.env.example .env; \
+	fi
+	@echo "🔍 Current .env status:"
+	@ls -la .env
+	@echo "📄 Current working directory:"
+	@pwd
+	@echo "⚠️  Make sure to edit .env with your real API keys!"
+	@echo "💡 Run: nano .env"
 
 # Enhanced deployment commands
 safe-restart: ## Safe restart - stop, clean, and start
@@ -308,3 +344,7 @@ deploy-fresh: ## Fresh deployment - clean everything and deploy
 	@make build
 	@make run
 	@echo "✅ Fresh deployment complete"
+
+env-debug: ## Run comprehensive environment debugging
+	@echo "🔍 Running environment diagnostics..."
+	@bash deployment/env-fix.sh
