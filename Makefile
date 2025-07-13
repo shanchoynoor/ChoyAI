@@ -411,6 +411,31 @@ fresh-start: ## Complete fresh start - clean duplicates and restart ChoyAI
 	@make run-no-check
 	@echo "✅ Fresh start complete"
 
+fix-personas: ## Fix AVAILABLE_PERSONAS format in .env file
+	@echo "🔧 Fixing AVAILABLE_PERSONAS format..."
+	@if [ -f .env ]; then \
+		if grep -q 'AVAILABLE_PERSONAS=\[' .env; then \
+			echo "📝 Fixing JSON format for AVAILABLE_PERSONAS..."; \
+			sed -i 's/AVAILABLE_PERSONAS=\[.*\]/AVAILABLE_PERSONAS=choy,stark,rose,sherlock,joker,hermione,harley/' .env; \
+			echo "✅ AVAILABLE_PERSONAS fixed"; \
+		else \
+			echo "⚠️  AVAILABLE_PERSONAS not found or already in correct format"; \
+		fi; \
+		if [ -f config/.env ]; then \
+			cp .env config/.env; \
+			echo "✅ Updated config/.env"; \
+		fi; \
+	else \
+		echo "❌ .env file not found"; \
+	fi
+
+quick-fix-restart: ## Quick fix for personas and restart
+	@echo "🚀 Quick fixing personas issue and restarting..."
+	@make fix-personas
+	@make env-fix-location
+	@make restart-main
+	@echo "✅ Quick fix complete"
+
 env-debug: ## Run comprehensive environment debugging
 	@echo "🔍 Running environment diagnostics..."
 	@bash deployment/env-fix.sh
