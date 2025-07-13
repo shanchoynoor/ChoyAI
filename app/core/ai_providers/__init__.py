@@ -5,7 +5,7 @@ This module contains all AI provider implementations and the provider manager
 that handles switching between different AI services based on task requirements.
 """
 
-from .base_provider import BaseAIProvider, AIMessage, AIResponse
+from .base_provider import BaseAIProvider, AIMessage, AIResponse, TaskType
 from .provider_manager import AIProviderManager
 from .deepseek_provider import DeepSeekProvider
 from .openai_provider import OpenAIProvider
@@ -17,6 +17,7 @@ __all__ = [
     'BaseAIProvider',
     'AIMessage',
     'AIResponse',
+    'TaskType',
     'AIProviderManager',
     'DeepSeekProvider',
     'OpenAIProvider',
