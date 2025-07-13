@@ -436,6 +436,68 @@ quick-fix-restart: ## Quick fix for personas and restart
 	@make restart-main
 	@echo "✅ Quick fix complete"
 
+check-env-format: ## Check and show .env format issues
+	@echo "🔍 Checking .env file format..."
+	@if [ -f .env ]; then \
+		echo "📄 Current .env file content (problematic lines):"; \
+		grep -n "AVAILABLE_PERSONAS\|TASK_ROUTING\|ALLOWED_USER_IDS" .env || echo "No problematic lines found"; \
+		echo ""; \
+		echo "🔍 Checking for JSON format issues..."; \
+		grep -E "\[|\]|\{|\}" .env || echo "No JSON brackets found"; \
+	else \
+		echo "❌ .env file not found"; \
+	fi
+
+fix-env-format: ## Fix all .env formatting issues comprehensively
+	@echo "🔧 Comprehensive .env format fixing..."
+	@if [ -f .env ]; then \
+		echo "📝 Creating backup..."; \
+		cp .env .env.backup; \
+		echo "🔧 Fixing AVAILABLE_PERSONAS..."; \
+		sed -i 's/AVAILABLE_PERSONAS=\[.*\]/AVAILABLE_PERSONAS=choy,stark,rose,sherlock,joker,hermione,harley/' .env; \
+		echo "🔧 Fixing ALLOWED_USER_IDS (if exists)..."; \
+		sed -i 's/ALLOWED_USER_IDS=.*/ALLOWED_USER_IDS=/' .env; \
+		echo "🔧 Removing any JSON brackets..."; \
+		sed -i 's/\[//g; s/\]//g; s/"//g' .env; \
+		echo "🔧 Fixing task routing (if exists)..."; \
+		sed -i 's/TASK_ROUTING_.*=.*//' .env; \
+		echo "✅ .env format fixed"; \
+		echo "📄 Updated AVAILABLE_PERSONAS line:"; \
+		grep "AVAILABLE_PERSONAS" .env || echo "AVAILABLE_PERSONAS not found"; \
+		if [ -f config/.env ]; then \
+			cp .env config/.env; \
+			echo "✅ Updated config/.env"; \
+		fi; \
+	else \
+		echo "❌ .env file not found"; \
+	fi
+
+nuclear-fix: ## Nuclear fix - completely rebuild .env and restart
+	@echo "💥 NUCLEAR FIX - Rebuilding .env from scratch..."
+	@if [ -f .env ]; then \
+		echo "💾 Backing up current .env..."; \
+		cp .env .env.nuclear.backup; \
+		echo "🔑 Extracting API keys..."; \
+		TELEGRAM_TOKEN=$$(grep "TELEGRAM_BOT_TOKEN=" .env | cut -d'=' -f2); \
+		DEEPSEEK_KEY=$$(grep "DEEPSEEK_API_KEY=" .env | cut -d'=' -f2); \
+		echo "📝 Creating clean .env..."; \
+		cp config/.env.example .env; \
+		if [ -n "$$TELEGRAM_TOKEN" ] && [ "$$TELEGRAM_TOKEN" != "your_telegram_bot_token_here" ]; then \
+			sed -i "s/TELEGRAM_BOT_TOKEN=.*/TELEGRAM_BOT_TOKEN=$$TELEGRAM_TOKEN/" .env; \
+			echo "✅ Telegram token preserved"; \
+		fi; \
+		if [ -n "$$DEEPSEEK_KEY" ] && [ "$$DEEPSEEK_KEY" != "your_deepseek_api_key_here" ]; then \
+			sed -i "s/DEEPSEEK_API_KEY=.*/DEEPSEEK_API_KEY=$$DEEPSEEK_KEY/" .env; \
+			echo "✅ DeepSeek key preserved"; \
+		fi; \
+		sed -i 's/AVAILABLE_PERSONAS=.*/AVAILABLE_PERSONAS=choy,stark,rose,sherlock,joker,hermione,harley/' .env; \
+		cp .env config/.env; \
+		echo "✅ Clean .env created and copied to config/"; \
+		make restart-main; \
+	else \
+		echo "❌ .env file not found"; \
+	fi
+
 env-debug: ## Run comprehensive environment debugging
 	@echo "🔍 Running environment diagnostics..."
 	@bash deployment/env-fix.sh
