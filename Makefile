@@ -362,6 +362,21 @@ env-fix-location: ## Fix .env file location for Docker Compose
 		echo "⚠️  .env file not found in root directory"; \
 	fi
 
+force-start: ## Force start without environment checks (for when .env has real keys)
+	@echo "🚀 Force starting ChoyAI Brain (bypassing checks)..."
+	@make force-stop
+	@make clean-containers
+	@make env-fix-location
+	@make run-no-check
+	@echo "✅ Force start complete"
+
+run-no-check: ## Run without environment validation
+	@echo "🚀 Starting ChoyAI Brain (no validation)..."
+	@make env-fix-location
+	docker-compose -f config/docker-compose.yml up -d
+	@echo "✅ Production server started"
+	@echo "📊 View logs with: make logs"
+
 env-debug: ## Run comprehensive environment debugging
 	@echo "🔍 Running environment diagnostics..."
 	@bash deployment/env-fix.sh
