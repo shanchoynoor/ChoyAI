@@ -256,10 +256,10 @@ class ChoyAIEngine:
             return {
                 "success": True,
                 "persona": {
-                    "name": persona["name"],
-                    "style": persona["style"],
-                    "purpose": persona["purpose"],
-                    "description": persona.get("description", "")
+                    "name": persona.name,
+                    "style": persona.style,
+                    "purpose": persona.purpose,
+                    "description": persona.description
                 },
                 "message": f"Successfully switched to {persona_name} persona"
             }
