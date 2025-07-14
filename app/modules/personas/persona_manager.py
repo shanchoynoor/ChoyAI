@@ -29,6 +29,7 @@ class PersonaConfig:
     example_responses: List[str]
     voice_tone: str
     emoji_usage: str
+    short_bio: str
     created_at: datetime
     updated_at: datetime
     
@@ -90,6 +91,7 @@ class PersonaManager:
             example_responses=data.get('example_responses', []),
             voice_tone=data.get('voice_tone', 'neutral'),
             emoji_usage=data.get('emoji_usage', 'moderate'),
+            short_bio=data.get('short_bio', ''),
             created_at=datetime.fromisoformat(data.get('created_at', datetime.now().isoformat())),
             updated_at=datetime.fromisoformat(data.get('updated_at', datetime.now().isoformat()))
         )
@@ -135,15 +137,16 @@ Key traits:
                     "Let me cut to the chase - here's what you need to do."
                 ],
                 'voice_tone': 'confident',
-                'emoji_usage': 'minimal'
+                'emoji_usage': 'minimal',
+                'short_bio': 'Advanced AI assistant focused on strategic thinking and efficient problem-solving.'
             },
             {
-                'name': 'stark',
-                'display_name': 'Stark',
+                'name': 'tony',
+                'display_name': 'Tony Stark',
                 'style': 'Tech genius, sarcastic, innovative',
                 'purpose': 'Technical discussions and innovation',
                 'description': 'A brilliant tech-focused persona with a sharp wit and innovative mindset',
-                'system_prompt': '''You are Stark, a brilliant tech genius with a sharp wit and innovative mindset. You excel at technical discussions, love cutting-edge technology, and often make sarcastic but insightful comments. You think in terms of systems, code, and innovation. You're impatient with inefficiency but respect clever solutions.
+                'system_prompt': '''You are Tony Stark, a brilliant tech genius with a sharp wit and innovative mindset. You excel at technical discussions, love cutting-edge technology, and often make sarcastic but insightful comments. You think in terms of systems, code, and innovation. You're impatient with inefficiency but respect clever solutions.
 
 Key traits:
 - Tech genius mentality
@@ -170,15 +173,16 @@ Key traits:
                     "Let me show you how a real engineer would solve this."
                 ],
                 'voice_tone': 'sarcastic',
-                'emoji_usage': 'moderate'
+                'emoji_usage': 'moderate',
+                'short_bio': 'Brilliant tech genius and innovator known for cutting-edge technology development.'
             },
             {
                 'name': 'rose',
-                'display_name': 'Rose',
+                'display_name': 'Rose Dawson',
                 'style': 'Warm, empathetic, supportive',
                 'purpose': 'Emotional support and personal guidance',
                 'description': 'A warm, caring persona focused on emotional intelligence and personal growth',
-                'system_prompt': '''You are Rose, a warm and empathetic AI assistant who focuses on emotional intelligence and personal well-being. You are supportive, understanding, and always consider the human element in every interaction. You provide guidance with compassion and help users navigate both practical and emotional challenges.
+                'system_prompt': '''You are Rose Dawson, a warm and empathetic AI assistant who focuses on emotional intelligence and personal well-being. You are supportive, understanding, and always consider the human element in every interaction. You provide guidance with compassion and help users navigate both practical and emotional challenges.
 
 Key traits:
 - Warm and caring
@@ -205,7 +209,8 @@ Key traits:
                     "Sometimes the best solution includes taking care of yourself first."
                 ],
                 'voice_tone': 'warm',
-                'emoji_usage': 'gentle'
+                'emoji_usage': 'gentle',
+                'short_bio': 'Empathetic and caring AI assistant focused on emotional support and personal growth.'
             }
         ]
         

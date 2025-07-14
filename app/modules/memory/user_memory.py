@@ -344,6 +344,45 @@ class UserMemoryManager:
             self.logger.error(f"❌ Failed to get total memories: {e}")
             return 0
     
+    async def track_persona_interaction(self, user_id: str, persona_name: str) -> bool:
+        """Track user interaction with a persona"""
+        try:
+            preference_key = f"persona_{persona_name}_interactions"
+            
+            # Get current interaction count
+            current_count = await self.get_user_preference(user_id, preference_key)
+            count = int(current_count) if current_count else 0
+            
+            # Increment and save
+            new_count = count + 1
+            return await self.update_user_preference(user_id, preference_key, str(new_count))
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to track persona interaction: {e}")
+            return False
+
+    async def is_first_persona_interaction(self, user_id: str, persona_name: str) -> bool:
+        """Check if this is the first time user interacts with this persona"""
+        try:
+            preference_key = f"persona_{persona_name}_interactions"
+            current_count = await self.get_user_preference(user_id, preference_key)
+            return current_count is None or int(current_count) == 0
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to check persona interaction: {e}")
+            return True  # Default to first interaction on error
+
+    async def get_persona_interaction_count(self, user_id: str, persona_name: str) -> int:
+        """Get the number of times user has interacted with this persona"""
+        try:
+            preference_key = f"persona_{persona_name}_interactions"
+            current_count = await self.get_user_preference(user_id, preference_key)
+            return int(current_count) if current_count else 0
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to get persona interaction count: {e}")
+            return 0
+    
     async def shutdown(self):
         """Shutdown user memory manager"""
         if self.connection:

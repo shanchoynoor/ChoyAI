@@ -327,94 +327,115 @@ class ChatEngine:
         memories = context["memories"]
         user_profile = context.get("user_profile")
         
-        prompt = f"""
-{persona.system_prompt}
+        # Start with the core persona prompt
+        prompt = f"""{persona.system_prompt}
 
-CURRENT USER CONTEXT:
-- Name: {user_ctx['name'] or 'Not provided'}
-- Username: @{user_ctx['username'] or 'Not provided'}
-- Bio: {user_ctx['bio']}
-- Member since: {user_ctx['member_since']}
-- Preferred persona: {user_ctx['preferred_persona']}"""
+PERSONA BIOGRAPHICAL INFORMATION:
+{persona.short_bio if persona.short_bio else 'No biographical information available.'}
 
-        # Add detailed user profile information if available
-        if user_profile:
-            prompt += f"""
-
-DETAILED USER PROFILE:
-- Full Name: {user_profile.name or 'Not provided'}
-- Age: {user_profile.age or 'Not provided'}
-- Location: {user_profile.city or 'Not provided'}{', ' + user_profile.country if user_profile.country else ''}
-- Profession: {user_profile.profession or 'Not provided'}
-- Education: {user_profile.education or 'Not provided'}
-- Relationship Status: {user_profile.relationship_status or 'Not provided'}
-- Communication Style: {user_profile.communication_style or 'Not analyzed yet'}"""
-
-            if user_profile.interests:
-                prompt += f"\n- Interests: {', '.join(user_profile.interests)}"
-            
-            if user_profile.personality_traits:
-                prompt += f"\n- Personality Traits: {', '.join(user_profile.personality_traits)}"
-                
-            if user_profile.goals:
-                prompt += f"\n- Goals: {', '.join(user_profile.goals)}"
-                
-            if user_profile.background:
-                prompt += f"\n- Background: {user_profile.background}"
-
-        prompt += f"""
-
-IMPORTANT MEMORIES ABOUT THIS USER:"""
-        
-        if memories:
-            for memory in memories:
-                prompt += f"\n- {memory}"
-        else:
-            prompt += "\n- No specific memories stored yet"
-        
-        # Add recent extraction insights
-        extracted_info = context.get("extracted_info", {})
-        if extracted_info:
-            prompt += f"\n\nRECENTLY DISCOVERED INFORMATION:"
-            for field, value in extracted_info.items():
-                if isinstance(value, list):
-                    prompt += f"\n- {field.title()}: {', '.join(value)}"
-                else:
-                    prompt += f"\n- {field.title()}: {value}"
-        
-        prompt += f"""
-
-CONVERSATION CONTEXT:
-Recent conversation history is provided in the message history above.
-
-RESPONSE GUIDELINES:
-- Always respond as the {persona.name} persona
-- Use the user's memories to personalize your responses
-- Reference past conversations when relevant
-- Keep responses under {settings.max_response_length} characters
-- Maintain the personality traits: {', '.join(persona.personality_traits)}
-- Response style: {persona.response_style}
+CRITICAL RESPONSE REQUIREMENTS:
+- Response style: {persona.response_style.get('length', 'concise')} length
 - Voice tone: {persona.voice_tone}
 - Emoji usage: {persona.emoji_usage}
+- NO theatrical descriptions (no "leans back", "checks watch", "pulls up", etc.)
+- NO unnecessary actions or gestures
+- Stay in character as {persona.name} but be direct and focused
+- Answer the question directly without excessive context
+- If asked about your personal history, background, past, or life experiences, refer to the biographical information above
 
-Remember: You have access to this user's conversation history and personal memories. Use this information to provide thoughtful, personalized responses that demonstrate continuity and understanding.
+USER INFO:
+- Name: {user_ctx['name'] or 'User'}
+- Username: @{user_ctx['username'] or 'Unknown'}"""
+
+        # Add only essential user profile information
+        if user_profile:
+            essential_info = []
+            if user_profile.city:
+                essential_info.append(f"Location: {user_profile.city}")
+            if user_profile.profession:
+                essential_info.append(f"Profession: {user_profile.profession}")
+            if user_profile.interests:
+                essential_info.append(f"Interests: {', '.join(user_profile.interests[:3])}")  # Only top 3
+            
+            if essential_info:
+                prompt += f"\n- " + "\n- ".join(essential_info)
+
+        # Add only the most important memories (limit to 5)
+        if memories:
+            important_memories = memories[:5]
+            prompt += f"\n\nKEY MEMORIES:\n"
+            for memory in important_memories:
+                prompt += f"- {memory}\n"
+        
+        prompt += f"""
+RESPONSE RULES:
+1. Be {persona.style.lower()}
+2. Answer directly and precisely
+3. No dramatic narration or role-playing actions
+4. Keep responses focused on the user's actual question
+5. Use persona traits: {', '.join(persona.personality_traits[:4])}
+6. Maximum {settings.max_response_length} characters
 """
         
         return prompt.strip()
     
     def _apply_persona_style(self, response: str, persona: Any) -> str:
         """Apply persona-specific styling to response"""
-        # This could include:
-        # - Emoji adjustment based on persona.emoji_usage
-        # - Tone adjustment
-        # - Format changes
-        # For now, just return the response as-is
         
-        # Ensure response isn't too long
+        # Remove common theatrical elements that shouldn't be there
+        theatrical_patterns = [
+            r'\*[^*]*\*',  # Remove *actions*
+            r'leans? (?:back|forward|in)',
+            r'(?:checks?|glances? at) (?:watch|clock|time)',
+            r'pulls? up (?:holographic|virtual|digital)',
+            r'(?:adjusts?|straightens?) (?:tie|collar|glasses)',
+            r'(?:smiles?|grins?|chuckles?|laughs?) (?:slightly|softly|quietly)',
+            r'(?:in virtual|in digital) (?:chair|space|reality)',
+            r'(?:fingers? )?steepled?',
+            r'(?:looks?|gazes?) (?:thoughtfully|contemplatively)',
+            r'(?:taps?|drums?) (?:fingers?|desk)',
+            r'(?:raises?|arches?) (?:eyebrow|brow)',
+        ]
+        
+        import re
+        
+        # Remove theatrical descriptions
+        for pattern in theatrical_patterns:
+            response = re.sub(pattern, '', response, flags=re.IGNORECASE)
+        
+        # Clean up extra whitespace and line breaks
+        response = re.sub(r'\s+', ' ', response).strip()
+        response = re.sub(r'\n\s*\n', '\n\n', response)  # Fix multiple line breaks
+        
+        # Apply persona-specific adjustments
+        if persona.emoji_usage == "minimal":
+            # Limit to 1-2 emojis max and only at the end
+            emoji_pattern = r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]+'
+            emojis = re.findall(emoji_pattern, response)
+            if len(emojis) > 2:
+                # Remove excess emojis, keep only last 1-2
+                for emoji in emojis[:-1]:
+                    response = response.replace(emoji, '', 1)
+        
+        # Apply length requirements based on persona style
+        response_length = persona.response_style.get('length', 'medium')
+        if response_length == 'concise':
+            # For concise responses, limit to 300 characters unless user specifically asks for details
+            if len(response) > 300:
+                sentences = response.split('. ')
+                truncated = sentences[0]
+                for sentence in sentences[1:]:
+                    if len(truncated + '. ' + sentence) <= 280:
+                        truncated += '. ' + sentence
+                    else:
+                        break
+                response = truncated + ('.' if not truncated.endswith('.') else '')
+        
+        # Ensure response isn't too long overall
         if len(response) > settings.max_response_length:
             response = response[:settings.max_response_length - 3] + "..."
         
-        return response
+        return response.strip()
     
     async def _extract_and_save_memories(
         self,

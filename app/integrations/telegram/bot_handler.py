@@ -414,7 +414,7 @@ Need help with something? Just ask me naturally! 💭
                 response += f"**{persona['name']}** - {persona['style']}\n"
                 response += f"_{persona['purpose']}_\n\n"
             
-            response += "Use `/persona <n>` to switch personalities."
+            response += "Use `/persona <name>` to switch personalities."
             
             await update.message.reply_text(response, parse_mode='Markdown')
             return
@@ -449,7 +449,7 @@ Need help with something? Just ask me naturally! 💭
             response += f"Style: _{persona['style']}_\n"
             response += f"Purpose: {persona['purpose']}\n\n"
         
-        response += "Use `/persona <n>` to switch to any personality."
+        response += "Use `/persona <name>` to switch to any personality."
         
         await update.message.reply_text(response, parse_mode='Markdown')
 
@@ -640,13 +640,13 @@ Before we continue chatting, I'd love to get to know you better!
             
             # The AI engine returns a string response directly
             if isinstance(result, str):
-                response = result
+                response = self._clean_ai_response(result)
                 # Log successful interaction
                 self.logger.debug(f"💬 Message processed for user {user_id}")
             else:
                 # Handle legacy dictionary format if it exists
                 if isinstance(result, dict) and result.get("success"):
-                    response = result["response"]
+                    response = self._clean_ai_response(result["response"])
                     self.logger.debug(f"💬 Message processed for user {user_id}")
                 else:
                     response = "❌ Sorry, I encountered an issue processing your message. Please try again."
@@ -747,3 +747,32 @@ What would you like to chat about, {user.first_name}? I'm here to help with anyt
             "messages_per_hour": self.message_count / max(uptime.total_seconds() / 3600, 1),
             "status": "running" if self.application else "stopped"
         }
+    
+    def _clean_ai_response(self, response: str) -> str:
+        """Clean AI response to remove unwanted theatrical elements"""
+        import re
+        
+        # Remove common theatrical patterns that shouldn't be in responses
+        patterns_to_remove = [
+            r'\*[^*]*\*',  # Remove *actions*
+            r'leans? (?:back|forward|in)[^.]*',
+            r'(?:checks?|glances? at) (?:watch|clock|time)[^.]*',
+            r'pulls? up (?:holographic|virtual|digital)[^.]*',
+            r'(?:in virtual|in digital) (?:chair|space|reality)',
+            r'(?:fingers? )?steepled?[^.]*',
+            r'(?:adjusts?|straightens?) (?:tie|collar|glasses)[^.]*',
+            r'(?:smiles?|grins?|chuckles?|laughs?) (?:slightly|softly|quietly)[^.]*',
+            r'(?:looks?|gazes?) (?:thoughtfully|contemplatively)[^.]*',
+            r'(?:taps?|drums?) (?:fingers?|desk)[^.]*',
+            r'(?:raises?|arches?) (?:eyebrow|brow)[^.]*',
+        ]
+        
+        cleaned_response = response
+        for pattern in patterns_to_remove:
+            cleaned_response = re.sub(pattern, '', cleaned_response, flags=re.IGNORECASE)
+        
+        # Clean up extra whitespace
+        cleaned_response = re.sub(r'\s+', ' ', cleaned_response).strip()
+        cleaned_response = re.sub(r'\n\s*\n', '\n\n', cleaned_response)
+        
+        return cleaned_response
