@@ -8,13 +8,12 @@ ChoyAI/
 ├── 📄 LICENSE                      # Project license
 ├── 📄 Makefile                     # Build automation and commands
 ├── 📄 requirements.txt             # Python dependencies
-├── 📄 main.py                      # Application entry point
 ├── 📄 .gitignore                   # Git ignore rules
 ├── 📄 .env                         # Environment variables (local)
 │
 ├── 🚀 app/                         # Main application source code
 │   ├── __init__.py
-│   ├── main.py                     # FastAPI application
+│   ├── main.py                     # Application entry point
 │   │
 │   ├── 🔧 config/                  # Configuration management
 │   │   ├── __init__.py
@@ -37,8 +36,7 @@ ChoyAI/
 │   │   ├── __init__.py
 │   │   └── telegram/               # Telegram bot integration
 │   │       ├── __init__.py
-│   │       ├── bot_handler.py      # Main bot handler
-│   │       └── bot_handler_new.py  # Alternative implementation
+│   │       └── bot_handler.py      # Main bot handler
 │   │
 │   ├── 🧩 modules/                 # Feature modules
 │   │   ├── __init__.py
@@ -63,8 +61,7 @@ ChoyAI/
 │   └── 🛠️ utils/                   # Utility functions
 │       ├── __init__.py
 │       ├── logger.py               # Logging utilities
-│       ├── security.py             # Security functions
-│       └── deepseek_api.py         # DeepSeek API utilities
+│       └── security.py             # Security functions
 │
 ├── ⚙️ config/                      # Configuration files
 │   ├── .env.example                # Environment template
@@ -78,21 +75,15 @@ ChoyAI/
 │   └── test-docker.sh              # Docker testing script
 │
 ├── 📚 docs/                        # Project documentation
-│   ├── DEPLOYMENT.md               # Deployment guide
-│   ├── DEPLOYMENT_GUIDE.md         # Detailed deployment
+│   ├── DEPLOYMENT_GUIDE.md         # Detailed deployment guide
 │   ├── DOCKER.md                   # Docker documentation
-│   ├── VPS_USER_SETUP.md           # VPS setup guide
-│   └── CLEANUP_COMPLETE.md         # Cleanup history
+│   └── PROJECT_STRUCTURE.md        # This file
 │
 ├── 🎭 templates/                   # Template files
-│   ├── personas/                   # AI persona definitions
-│   │   ├── choy.yaml
-│   │   ├── stark.yaml
-│   │   └── rose.yaml
-│   └── prompts/                    # AI prompts
-│       ├── choy.txt
-│       ├── stark.txt
-│       └── rose.txt
+│   └── personas/                   # AI persona definitions
+│       ├── choy.yaml
+│       ├── stark.yaml
+│       └── rose.yaml
 │
 ├── 🧪 tests/                       # Test files (empty, ready for tests)
 │

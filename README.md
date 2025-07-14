@@ -1,4 +1,4 @@
-# 🧠 Choy AI Brain
+# 🧠 Choy AI
 
 **Advanced Personal AI Assistant with Long-Term Memory & Multiple Personalities**
 
