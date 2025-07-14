@@ -375,67 +375,25 @@ This helps me provide more personalized assistance! After that, you'll have acce
 """
         else:
             help_msg = """
-� **Choy AI - Help Guide**
-
-**Basic Usage:**
-Just chat with me naturally! I understand context and remember our conversations.
-
-**Personality System:**
-• I start with the **Choy** persona by default (confident, strategic, direct)
-• Switch personalities anytime with `/persona <name>`:
-  - `/persona choy` - Confident, strategic, direct
-  - `/persona stark` - Tech genius, sarcastic, innovative
-  - `/persona rose` - Warm, empathetic, supportive
+🤖 **Choy AI - Commands**
 
 **Core Commands:**
-• `/start` - Welcome message and setup
-• `/help` - This help guide
-• `/persona <name>` - Switch personality (choy, stark, rose)
-• `/personas` - List all available personalities
-• `/myid` - Show your user information
+• `/start` - Welcome message and overview
+• `/persona <name>` - Switch AI personality (`/persona stark`)
+• `/personas` - List available personalities
+• `/remember <key> <value>` - Save a memory (`/remember favorite_color blue`)
+• `/recall <key>` - Retrieve a memory (`/recall favorite_color`)
+• `/memories` - List all memories
+• `/bio <text>` - Set biography (`/bio Software engineer`)
+• `/history` - View conversation history
+• `/stats` - View AI statistics
 
-**Memory System:**
-• I automatically remember important details from our chats
-• `/remember <key> <value>` - Save specific information
-• `/recall <key>` - Retrieve saved information
-• `/memories` - List all your saved memories
-• `/forget <key>` - Delete a memory
+**Quick Tips:**
+• Just chat naturally - I remember our conversations!
+• Switch personas for different conversation styles
+• I automatically learn about you from our chats
 
-**AI Provider Commands:**
-• `/providers` - Show available AI providers and status
-• `/switchai <task> <provider>` - Switch AI provider for specific tasks
-• `/aitask <task> <message>` - Force a specific task type
-
-**User Profile Commands:**
-• `/profile` - View your AI-generated profile
-• `/analytics` - View conversation analytics and insights
-• `/fullhistory [limit] [days]` - View detailed conversation history
-
-**Available Task Types:**
-• `conversation` - General chat
-• `technical` - Programming and tech questions
-• `creative` - Writing and creative tasks
-• `analysis` - Deep analysis and research
-• `research` - Information gathering
-• `coding` - Code generation
-• `problem` - Problem solving
-• `emotional` - Emotional support
-• `summary` - Summarization tasks
-• `translate` - Translation tasks
-
-**Tips:**
-• Be specific when saving memories for better organization
-• Try different personalities for different types of conversations
-• I learn from our interactions to provide better responses over time
-• Use different AI providers for specialized tasks
-
-**Examples:**
-• "Hi, how are you?" - Normal conversation
-• `/persona stark` - Switch to tech genius personality
-• `/remember birthday April 15` - Save important date
-• `/aitask creative Write a poem about space` - Force creative task
-
-Need help with something specific? Just ask me!
+Need help with something? Just ask me naturally! 💭
 """
         
         await update.message.reply_text(help_msg, parse_mode='Markdown')
