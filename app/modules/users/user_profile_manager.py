@@ -67,6 +67,18 @@ class UserPersona:
         if self.updated_at is None:
             self.updated_at = datetime.now()
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serializable dictionary"""
+        result = {}
+        for key, value in self.__dict__.items():
+            if isinstance(value, datetime):
+                result[key] = value.isoformat() if value else None
+            elif isinstance(value, (list, dict)):
+                result[key] = value if value else ([] if isinstance(value, list) else {})
+            else:
+                result[key] = value
+        return result
+
 
 class UserProfile(Base):
     """SQLAlchemy model for user profiles"""

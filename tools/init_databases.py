@@ -151,6 +151,7 @@ def create_conversation_db(db_path: Path):
             started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             message_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
             UNIQUE(user_id, session_id)
         )
     ''')

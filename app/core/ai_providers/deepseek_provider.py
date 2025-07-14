@@ -123,15 +123,10 @@ class DeepSeekProvider(BaseAIProvider):
                         
                         # Log successful interaction
                         log_integration_activity(
-                            integration="deepseek",
-                            action="chat_completion",
-                            success=True,
-                            response_time=response_time,
-                            metadata={
-                                "model": model,
-                                "task_type": task_type.value,
-                                "tokens_used": data.get("usage", {}).get("total_tokens", 0)
-                            }
+                            service="deepseek",
+                            operation="chat_completion",
+                            status="success",
+                            details=f"Model: {model}, Task: {task_type.value}, Tokens: {data.get('usage', {}).get('total_tokens', 0)}"
                         )
                         
                         return AIResponse(

@@ -133,7 +133,21 @@ class ConversationMemoryManager:
         try:
             cursor = self.connection.cursor()
             
-            metadata_json = json.dumps(metadata) if metadata else None
+            # Handle metadata serialization safely
+            metadata_json = None
+            if metadata:
+                try:
+                    # Check if any value is a UserPersona object and convert to dict
+                    serializable_metadata = {}
+                    for key, value in metadata.items():
+                        if hasattr(value, 'to_dict'):  # UserPersona or similar objects
+                            serializable_metadata[key] = value.to_dict()
+                        else:
+                            serializable_metadata[key] = value
+                    metadata_json = json.dumps(serializable_metadata)
+                except (TypeError, AttributeError) as e:
+                    self.logger.warning(f"Could not serialize metadata: {e}")
+                    metadata_json = json.dumps({"error": "Failed to serialize metadata"})
             
             cursor.execute("""
             INSERT INTO messages (conversation_id, user_id, message_type, content, persona, metadata)
