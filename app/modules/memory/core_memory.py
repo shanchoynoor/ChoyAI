@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
 from app.config.settings import settings
 
 
@@ -110,6 +116,18 @@ class CoreMemoryManager:
                 ("system", "version", "1.0.0", "Current system version"),
                 ("system", "purpose", "Personal AI assistant with long-term memory and multiple personalities", "Main purpose of the system"),
                 
+                # Developer information
+                ("developer", "name", "Shanchoy Noor", "Developer and founder of Choy AI"),
+                ("developer", "display_name", "Choy (Choy AI Developer)", "Developer display name"),
+                ("developer", "birthplace", "Bheramara, Kushtia", "Developer birthplace"),
+                ("developer", "moved_to_dhaka", "2012", "Year moved to Dhaka"),
+                ("developer", "experience", "8+ years", "Years of experience in design, AI, automation"),
+                ("developer", "current_role", "UI/UX Designer & Video Editor at Iqrasys Solutions Ltd.", "Current primary employment"),
+                ("developer", "social_media_management", "YouTube Village Park, AroundMeBD, Village Grandpa's Cooking", "Platforms managed"),
+                ("developer", "company_founded", "Choy Agency Ltd", "Company founded by developer"),
+                ("developer", "team_size", "30+ members", "Size of developer's agency team"),
+                ("developer", "creator_of", "Choy AI", "What the developer created"),
+                
                 # Capabilities
                 ("capabilities", "memory", "Long-term memory with semantic search", "Memory system capabilities"),
                 ("capabilities", "personas", "Multiple AI personalities for different interaction styles", "Persona system capabilities"),
@@ -117,7 +135,7 @@ class CoreMemoryManager:
                 
                 # Personas
                 ("personas", "default", "choy", "Default persona"),
-                ("personas", "available", "choy,stark,rose,sherlock,joker,hermione,harley", "Available personas"),
+                ("personas", "available", "choy,stark,rose", "Available personas"),
                 
                 # Platform info
                 ("platform", "telegram", "Active", "Telegram integration status"),
@@ -128,7 +146,44 @@ class CoreMemoryManager:
             for category, key, value, description in initial_facts:
                 await self.save_core_fact(category, key, value, description, "system_init")
             
+            # Load developer profile from YAML if it exists
+            await self._load_developer_profile()
+            
             self.logger.info(f"✅ Loaded {len(initial_facts)} initial core facts")
+    
+    async def _load_developer_profile(self):
+        """Load developer profile from YAML file"""
+        if not YAML_AVAILABLE:
+            self.logger.warning("PyYAML not available, skipping developer profile loading")
+            return
+            
+        try:
+            profile_path = Path(settings.data_dir) / "core_memory" / "developer_profile.yaml"
+            if profile_path.exists():
+                with open(profile_path, 'r', encoding='utf-8') as f:
+                    profile_data = yaml.safe_load(f)
+                
+                # Store developer bio as a knowledge base entry
+                await self.save_knowledge(
+                    topic="developer_biography",
+                    content=profile_data.get('short_bio', ''),
+                    tags="developer,biography,founder",
+                    importance=5
+                )
+                
+                # Store privacy policy
+                await self.save_knowledge(
+                    topic="developer_privacy_policy",
+                    content=profile_data.get('privacy_policy', ''),
+                    tags="developer,privacy,policy",
+                    importance=5
+                )
+                
+                self.logger.info("✅ Loaded developer profile from YAML")
+                
+        except Exception as e:
+            self.logger.warning(f"Could not load developer profile: {e}")
+            # This is not critical, so we continue
     
     async def save_core_fact(
         self,
