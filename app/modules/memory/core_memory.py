@@ -164,18 +164,18 @@ class CoreMemoryManager:
                     profile_data = yaml.safe_load(f)
                 
                 # Store developer bio as a knowledge base entry
-                await self.save_knowledge(
+                await self.add_knowledge(
                     topic="developer_biography",
                     content=profile_data.get('short_bio', ''),
-                    tags="developer,biography,founder",
+                    tags=["developer", "biography", "founder"],
                     importance=5
                 )
                 
                 # Store privacy policy
-                await self.save_knowledge(
+                await self.add_knowledge(
                     topic="developer_privacy_policy",
                     content=profile_data.get('privacy_policy', ''),
-                    tags="developer,privacy,policy",
+                    tags=["developer", "privacy", "policy"],
                     importance=5
                 )
                 
