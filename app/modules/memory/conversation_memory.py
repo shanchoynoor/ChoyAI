@@ -124,14 +124,22 @@ class ConversationMemoryManager:
         self,
         conversation_id: int,
         user_id: str,
-        message_type: str,  # 'user' or 'ai'
+        role: str,  # 'user', 'assistant', or 'system'
         content: str,
         persona: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None
     ) -> bool:
         """Log a message in the conversation"""
         try:
             cursor = self.connection.cursor()
+            
+            # Convert legacy message_type to role format
+            if role == "ai":
+                role = "assistant"
+            elif role not in ["user", "assistant", "system"]:
+                role = "user"  # Default fallback
             
             # Handle metadata serialization safely
             metadata_json = None
@@ -150,9 +158,9 @@ class ConversationMemoryManager:
                     metadata_json = json.dumps({"error": "Failed to serialize metadata"})
             
             cursor.execute("""
-            INSERT INTO messages (conversation_id, user_id, message_type, content, persona, metadata)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (conversation_id, user_id, message_type, content, persona, metadata_json))
+            INSERT INTO messages (conversation_id, user_id, role, content, persona, metadata, provider, model)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (conversation_id, user_id, role, content, persona, metadata_json, provider, model))
             
             # Update conversation activity
             cursor.execute("""
@@ -164,7 +172,7 @@ class ConversationMemoryManager:
             
             self.connection.commit()
             
-            self.logger.debug(f"💬 Logged {message_type} message in conversation {conversation_id}")
+            self.logger.debug(f"💬 Logged {role} message in conversation {conversation_id}")
             return True
             
         except Exception as e:

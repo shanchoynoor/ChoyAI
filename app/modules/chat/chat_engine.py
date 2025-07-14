@@ -91,7 +91,7 @@ class ChatEngine:
             await self.conversation_memory.log_message(
                 conversation_id=conversation_id,
                 user_id=user_id,
-                message_type="user",
+                role="user",
                 content=message,
                 metadata=additional_context
             )
@@ -132,7 +132,7 @@ class ChatEngine:
             await self.conversation_memory.log_message(
                 conversation_id=conversation_id,
                 user_id=user_id,
-                message_type="ai",
+                role="assistant",
                 content=response,
                 persona=persona.name
             )

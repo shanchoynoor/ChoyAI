@@ -47,17 +47,63 @@ def fix_messages_table(db_path: Path, logger):
         with sqlite3.connect(str(db_path)) as conn:
             cursor = conn.cursor()
             
-            # Check if message_type column exists
+            # Check current table structure
             cursor.execute("PRAGMA table_info(messages)")
             columns = [column[1] for column in cursor.fetchall()]
             
-            if 'message_type' not in columns:
-                logger.info("Adding missing 'message_type' column to messages table")
-                cursor.execute("ALTER TABLE messages ADD COLUMN message_type TEXT DEFAULT 'user'")
+            # Check if we have role column
+            has_role = 'role' in columns
+            has_message_type = 'message_type' in columns
+            
+            if not has_role and has_message_type:
+                logger.info("Renaming 'message_type' column to 'role' in messages table")
+                # Create new table with correct schema
+                cursor.execute("""
+                    CREATE TABLE messages_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        conversation_id INTEGER NOT NULL,
+                        user_id TEXT NOT NULL,
+                        role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+                        content TEXT NOT NULL,
+                        provider TEXT,
+                        model TEXT,
+                        persona TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        metadata TEXT,
+                        FOREIGN KEY (conversation_id) REFERENCES conversations (id)
+                    )
+                """)
+                
+                # Copy data from old table, mapping message_type to role
+                cursor.execute("""
+                    INSERT INTO messages_new (id, conversation_id, user_id, role, content, provider, model, persona, timestamp, metadata)
+                    SELECT id, conversation_id, user_id, 
+                           CASE WHEN message_type = 'ai' THEN 'assistant' ELSE message_type END as role,
+                           content, provider, model, persona, timestamp, metadata
+                    FROM messages
+                """)
+                
+                # Drop old table and rename new one
+                cursor.execute("DROP TABLE messages")
+                cursor.execute("ALTER TABLE messages_new RENAME TO messages")
+                
+                # Recreate indexes
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)')
+                
                 conn.commit()
-                logger.info("✅ Added message_type column to messages table")
+                logger.info("✅ Fixed messages table schema - renamed message_type to role")
+                
+            elif not has_role and not has_message_type:
+                logger.info("Adding missing 'role' column to messages table")
+                cursor.execute("ALTER TABLE messages ADD COLUMN role TEXT DEFAULT 'user'")
+                conn.commit()
+                logger.info("✅ Added role column to messages table")
+            elif has_role:
+                logger.info("Role column already exists in messages table")
             else:
-                logger.info("Message_type column already exists in messages table")
+                logger.info("Messages table schema looks correct")
                 
     except Exception as e:
         logger.error(f"❌ Error fixing messages table: {e}")
