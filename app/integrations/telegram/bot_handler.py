@@ -638,15 +638,19 @@ Before we continue chatting, I'd love to get to know you better!
                 platform="telegram"
             )
             
-            if result["success"]:
-                response = result["response"]
-                
+            # The AI engine returns a string response directly
+            if isinstance(result, str):
+                response = result
                 # Log successful interaction
                 self.logger.debug(f"💬 Message processed for user {user_id}")
-                
             else:
-                response = "❌ Sorry, I encountered an issue processing your message. Please try again."
-                self.logger.error(f"Failed to process message: {result.get('error')}")
+                # Handle legacy dictionary format if it exists
+                if isinstance(result, dict) and result.get("success"):
+                    response = result["response"]
+                    self.logger.debug(f"💬 Message processed for user {user_id}")
+                else:
+                    response = "❌ Sorry, I encountered an issue processing your message. Please try again."
+                    self.logger.error(f"Failed to process message: {result.get('error') if isinstance(result, dict) else 'Unknown error'}")
             
         except Exception as e:
             self.logger.error(f"Error processing message from {user_id}: {e}")

@@ -5,12 +5,16 @@ Migration script to add missing status column to conversations table
 
 import sqlite3
 import logging
+import sys
 from pathlib import Path
-from app.config.settings import settings
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def migrate_conversations_table():
     """Add status column to conversations table if it doesn't exist"""
-    db_path = settings.conversation_db
+    # Use default path if settings not available
+    db_path = Path("data/databases/conversation_memory.db")
     
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

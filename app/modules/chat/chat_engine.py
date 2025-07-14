@@ -465,9 +465,7 @@ Remember: You have access to this user's conversation history and personal memor
     
     async def shutdown(self):
         """Shutdown chat engine"""
-        if self.deepseek_api:
-            await self.deepseek_api.close()
-        
+        # Note: Provider cleanup is handled by the AI Engine
         self.logger.info("💭 Chat Engine shutdown complete")
 
 
