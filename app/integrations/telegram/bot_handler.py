@@ -79,7 +79,7 @@ class TelegramBotHandler:
             questions_answered = 0
             next_question = None
             
-            if not profile.location:
+            if not profile.city:
                 next_question = "city"
             else:
                 questions_answered += 1
@@ -504,15 +504,15 @@ No profile data available yet. Chat with me more and I'll automatically build yo
 **Personal Information:**
 • **Name:** {profile.name or 'Not detected'}
 • **Age:** {profile.age or 'Not detected'}
-• **Location:** {profile.location or 'Not detected'}
+• **Location:** {profile.city or 'Not detected'}
 • **Profession:** {profile.profession or 'Not detected'}
 
 **Interests:** {', '.join(profile.interests) if profile.interests else 'Learning from conversations...'}
 
 **Communication Style:** {profile.communication_style or 'Analyzing...'}
 
-**Profile Confidence:** {profile.confidence_score:.1%}
-**Last Updated:** {profile.updated_at.strftime('%Y-%m-%d %H:%M')}
+**Profile Confidence:** {profile.confidence_scores.get('overall', 0.0):.1% if profile.confidence_scores else '0.0%'}
+**Last Updated:** {profile.updated_at.strftime('%Y-%m-%d %H:%M') if hasattr(profile, 'updated_at') and profile.updated_at else 'Unknown'}
 
 _This profile is automatically generated from our conversations._
 """
