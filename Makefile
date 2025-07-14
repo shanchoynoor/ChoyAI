@@ -37,16 +37,16 @@ help: ## Show this help message
 # Setup and deployment
 setup: ## Complete production setup (requires sudo)
 	@echo "🚀 Setting up ChoyAI for production..."
-	@if [ "$$EUID" -ne 0 ]; then \
+	@if [ "$$(id -u)" -ne 0 ]; then \
 		echo "$(YELLOW)⚠️  This command requires sudo privileges$(NC)"; \
 		echo "Run: sudo make setup"; \
 		exit 1; \
 	fi
-	@bash deployment/setup_production.sh
+	@bash setup_production.sh
 
 deploy: check-env ## Deploy ChoyAI with Docker (validates config)
 	@echo "🚀 Deploying ChoyAI..."
-	@bash deployment/deploy_docker.sh
+	@bash deploy_docker.sh
 
 # Container management
 start: ## Start ChoyAI services
@@ -183,7 +183,7 @@ check-env: ## Check if .env file exists and is configured
 
 install-systemd: ## Install systemd service (requires sudo)
 	@echo "$(BLUE)⚙️  Installing systemd service...$(NC)"
-	@if [ "$$EUID" -ne 0 ]; then \
+	@if [ "$$(id -u)" -ne 0 ]; then \
 		echo "$(YELLOW)⚠️  This command requires sudo privileges$(NC)"; \
 		echo "Run: sudo make install-systemd"; \
 		exit 1; \
