@@ -4,9 +4,9 @@
 
 ```
 ChoyAI/
-├── 📄 README.md                    # Main project documentation
 ├── 📄 LICENSE                      # Project license
 ├── 📄 Makefile                     # Build automation and commands
+├── 📄 README.md                    # Main project documentation
 ├── 📄 requirements.txt             # Python dependencies
 ├── 📄 .gitignore                   # Git ignore rules
 ├── 📄 .env                         # Environment variables (local)
@@ -75,9 +75,12 @@ ChoyAI/
 │   └── test-docker.sh              # Docker testing script
 │
 ├── 📚 docs/                        # Project documentation
+│   ├── CLEANUP_SUMMARY.md          # Summary of project cleanup
 │   ├── DEPLOYMENT_GUIDE.md         # Detailed deployment guide
 │   ├── DOCKER.md                   # Docker documentation
-│   └── PROJECT_STRUCTURE.md        # This file
+│   ├── PROJECT_STRUCTURE.md        # This file (project structure)
+│   ├── SYSTEM_STATUS.md            # System status and monitoring
+│   └── VPS_SETUP_GUIDE.md          # VPS setup instructions
 │
 ├── 🎭 templates/                   # Template files
 │   └── personas/                   # AI persona definitions
