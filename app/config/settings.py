@@ -238,6 +238,13 @@ class Settings(BaseSettings):
         description="List of available personas"
     )
     
+    @validator('available_personas', pre=True)
+    def parse_available_personas(cls, v):
+        if isinstance(v, str):
+            # Parse comma-separated string
+            return [persona.strip() for persona in v.split(',') if persona.strip()]
+        return v
+    
     # ===== SECURITY =====
     secret_key: SecretStr = Field(
         default="choy-ai-secret-key-change-in-production",
@@ -250,6 +257,13 @@ class Settings(BaseSettings):
         env="ALLOWED_USERS",
         description="List of allowed user IDs (if None, all users allowed)"
     )
+    
+    @validator('allowed_users', pre=True)
+    def parse_allowed_users(cls, v):
+        if isinstance(v, str) and v.strip():
+            # Parse comma-separated string
+            return [user_id.strip() for user_id in v.split(',') if user_id.strip()]
+        return v
     
     rate_limit_per_minute: int = Field(
         default=20,
