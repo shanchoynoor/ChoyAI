@@ -226,7 +226,8 @@ class Settings(BaseSettings):
     @validator('personas_dir', pre=True, always=True)
     def set_personas_dir(cls, v, values):
         if v is None:
-            return values['data_dir'] / 'personas'
+            # Use templates/personas directory relative to current working directory
+            return Path.cwd() / 'templates' / 'personas'
         return v
     
     available_personas: List[str] = Field(
