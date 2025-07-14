@@ -222,9 +222,17 @@ class AnthropicProvider(BaseAIProvider):
                 "messages": [{"role": "user", "content": "Hi"}]
             }
             
+            # Ensure headers use string values, not SecretStr
+            headers = {
+                "x-api-key": str(self.api_key),
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01"
+            }
+            
             async with self.session.post(
                 f"{self.base_url}/messages",
-                json=test_payload
+                json=test_payload,
+                headers=headers
             ) as response:
                 return response.status == 200
                 

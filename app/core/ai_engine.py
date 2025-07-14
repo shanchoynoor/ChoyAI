@@ -88,6 +88,10 @@ class ChoyAIEngine:
             self.persona_manager = PersonaManager()
             await self.persona_manager.initialize()
             
+            # Initialize user profile manager
+            self.user_profile_manager = UserProfileManager()
+            await self.user_profile_manager.initialize()
+            
             # Initialize AI Provider Manager
             self.ai_provider_manager = AIProviderManager()
             await self.ai_provider_manager.initialize()

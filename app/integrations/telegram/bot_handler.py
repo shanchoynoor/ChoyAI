@@ -57,6 +57,14 @@ class TelegramBotHandler:
     async def check_user_onboarding_status(self, user_id: str) -> Dict[str, Any]:
         """Check if user has completed onboarding questions"""
         try:
+            # Check if user profile manager is available
+            if not self.ai_engine.user_profile_manager:
+                return {
+                    "completed": False,
+                    "next_question": "city",
+                    "questions_answered": 0
+                }
+                
             # Check if user profile exists and has basic info
             profile = await self.ai_engine.user_profile_manager.get_user_profile(user_id)
             
@@ -513,6 +521,10 @@ Need help with something specific? Just ask me!
         user_id = str(update.effective_user.id)
         
         try:
+            if not self.ai_engine.user_profile_manager:
+                await update.message.reply_text("❌ User profile system not available")
+                return
+                
             profile = await self.ai_engine.user_profile_manager.get_user_profile(user_id)
             
             if not profile:
