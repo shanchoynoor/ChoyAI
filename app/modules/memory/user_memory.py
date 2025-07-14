@@ -84,10 +84,10 @@ class UserMemoryManager:
         CREATE TABLE IF NOT EXISTS user_preferences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id VARCHAR(100) NOT NULL,
-            key VARCHAR(100) NOT NULL,
-            value TEXT NOT NULL,
+            preference_key VARCHAR(100) NOT NULL,
+            preference_value TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, key)
+            UNIQUE(user_id, preference_key)
         )
         """)
         
@@ -258,7 +258,7 @@ class UserMemoryManager:
             cursor = self.connection.cursor()
             
             cursor.execute("""
-            INSERT OR REPLACE INTO user_preferences (user_id, key, value, updated_at)
+            INSERT OR REPLACE INTO user_preferences (user_id, preference_key, preference_value, updated_at)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             """, (user_id, key, value))
             
@@ -277,11 +277,11 @@ class UserMemoryManager:
             cursor = self.connection.cursor()
             
             cursor.execute("""
-            SELECT value FROM user_preferences WHERE user_id = ? AND key = ?
+            SELECT preference_value FROM user_preferences WHERE user_id = ? AND preference_key = ?
             """, (user_id, key))
             
             row = cursor.fetchone()
-            return row['value'] if row else None
+            return row['preference_value'] if row else None
             
         except Exception as e:
             self.logger.error(f"❌ Failed to get preference: {e}")
