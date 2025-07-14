@@ -234,16 +234,24 @@ class Settings(BaseSettings):
             "choy", "stark", "rose", "sherlock", 
             "joker", "hermione", "harley"
         ],
-        env="AVAILABLE_PERSONAS",
         description="List of available personas"
     )
     
-    @validator('available_personas', pre=True)
-    def parse_available_personas(cls, v):
-        if isinstance(v, str):
+    @validator('available_personas', pre=True, always=True)
+    def parse_available_personas(cls, v, values):
+        # Check environment variable directly
+        import os
+        env_value = os.getenv('AVAILABLE_PERSONAS')
+        if env_value:
             # Parse comma-separated string
+            return [persona.strip() for persona in env_value.split(',') if persona.strip()]
+        # Return default if not set
+        if isinstance(v, str):
             return [persona.strip() for persona in v.split(',') if persona.strip()]
-        return v
+        return v or [
+            "choy", "stark", "rose", "sherlock", 
+            "joker", "hermione", "harley"
+        ]
     
     # ===== SECURITY =====
     secret_key: SecretStr = Field(
@@ -254,16 +262,21 @@ class Settings(BaseSettings):
     
     allowed_users: Optional[List[str]] = Field(
         default=None,
-        env="ALLOWED_USERS",
         description="List of allowed user IDs (if None, all users allowed)"
     )
     
-    @validator('allowed_users', pre=True)
-    def parse_allowed_users(cls, v):
-        if isinstance(v, str) and v.strip():
+    @validator('allowed_users', pre=True, always=True)
+    def parse_allowed_users(cls, v, values):
+        # Check environment variable directly
+        import os
+        env_value = os.getenv('ALLOWED_USERS')
+        if env_value and env_value.strip():
             # Parse comma-separated string
+            return [user_id.strip() for user_id in env_value.split(',') if user_id.strip()]
+        # Return None if not set or empty
+        if isinstance(v, str) and v.strip():
             return [user_id.strip() for user_id in v.split(',') if user_id.strip()]
-        return v
+        return None
     
     rate_limit_per_minute: int = Field(
         default=20,
