@@ -67,37 +67,60 @@ class PersonaManager:
             await self._create_default_personas()
             return
         
+        # Clear existing personas to ensure fresh load
+        self.personas.clear()
+        
         # Load all YAML files in personas directory
-        for persona_file in personas_dir.glob("*.yaml"):
+        yaml_files_found = list(personas_dir.glob("*.yaml"))
+        
+        if not yaml_files_found:
+            self.logger.warning("No YAML files found in personas directory, creating defaults")
+            await self._create_default_personas()
+            return
+        
+        for persona_file in yaml_files_found:
             try:
                 await self._load_persona_file(persona_file)
             except Exception as e:
                 self.logger.error(f"Failed to load persona from {persona_file}: {e}")
+        
+        self.logger.info(f"✅ Loaded {len(self.personas)} personas from YAML files: {list(self.personas.keys())}")
     
     async def _load_persona_file(self, file_path: Path):
         """Load a single persona from YAML file"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        
-        persona = PersonaConfig(
-            name=data['name'],
-            display_name=data.get('display_name', data['name'].title()),
-            style=data['style'],
-            purpose=data['purpose'],
-            description=data.get('description', ''),
-            system_prompt=data['system_prompt'],
-            personality_traits=data.get('personality_traits', []),
-            response_style=data.get('response_style', {}),
-            example_responses=data.get('example_responses', []),
-            voice_tone=data.get('voice_tone', 'neutral'),
-            emoji_usage=data.get('emoji_usage', 'moderate'),
-            short_bio=data.get('short_bio', ''),
-            created_at=datetime.fromisoformat(data.get('created_at', datetime.now().isoformat())),
-            updated_at=datetime.fromisoformat(data.get('updated_at', datetime.now().isoformat()))
-        )
-        
-        self.personas[persona.name] = persona
-        self.logger.debug(f"📝 Loaded persona: {persona.name}")
+        try:
+            self.logger.debug(f"🔄 Loading persona from: {file_path}")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            
+            if not data or 'name' not in data:
+                self.logger.error(f"❌ Invalid persona file (missing name): {file_path}")
+                return
+            
+            persona = PersonaConfig(
+                name=data['name'],
+                display_name=data.get('display_name', data['name'].title()),
+                style=data['style'],
+                purpose=data['purpose'],
+                description=data.get('description', ''),
+                system_prompt=data['system_prompt'],
+                personality_traits=data.get('personality_traits', []),
+                response_style=data.get('response_style', {}),
+                example_responses=data.get('example_responses', []),
+                voice_tone=data.get('voice_tone', 'neutral'),
+                emoji_usage=data.get('emoji_usage', 'moderate'),
+                short_bio=data.get('short_bio', ''),
+                created_at=datetime.fromisoformat(data.get('created_at', datetime.now().isoformat())),
+                updated_at=datetime.fromisoformat(data.get('updated_at', datetime.now().isoformat()))
+            )
+            
+            self.personas[persona.name] = persona
+            self.logger.info(f"✅ Loaded persona: {persona.name} from {file_path.name}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load persona from {file_path}: {e}")
+            raise
     
     async def _create_default_personas(self):
         """Create default personas if none exist"""
@@ -369,6 +392,47 @@ Key traits:
             'personas_directory': str(settings.personas_dir)
         }
 
+    async def reload_personas(self) -> bool:
+        """Force reload all personas from YAML files"""
+        try:
+            self.logger.info("🔄 Force reloading all personas...")
+            await self._load_personas()
+            self.logger.info(f"✅ Reloaded {len(self.personas)} personas: {list(self.personas.keys())}")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Failed to reload personas: {e}")
+            return False
 
-# Export the main class
-__all__ = ["PersonaManager", "PersonaConfig"]
+    async def debug_persona_loading(self) -> Dict[str, Any]:
+        """Debug information about persona loading"""
+        try:
+            personas_dir = settings.personas_dir
+            
+            debug_info = {
+                'personas_directory': str(personas_dir),
+                'directory_exists': personas_dir.exists(),
+                'yaml_files': [],
+                'loaded_personas': list(self.personas.keys()),
+                'default_persona': self.default_persona
+            }
+            
+            if personas_dir.exists():
+                yaml_files = list(personas_dir.glob("*.yaml"))
+                debug_info['yaml_files'] = [str(f.name) for f in yaml_files]
+                
+                for yaml_file in yaml_files:
+                    try:
+                        with open(yaml_file, 'r', encoding='utf-8') as f:
+                            data = yaml.safe_load(f)
+                            debug_info[f'file_{yaml_file.name}'] = {
+                                'name': data.get('name', 'MISSING'),
+                                'display_name': data.get('display_name', 'MISSING'),
+                                'file_size': yaml_file.stat().st_size
+                            }
+                    except Exception as e:
+                        debug_info[f'file_{yaml_file.name}'] = f'ERROR: {e}'
+            
+            return debug_info
+            
+        except Exception as e:
+            return {'error': str(e)}
