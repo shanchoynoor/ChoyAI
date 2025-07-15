@@ -202,6 +202,14 @@ class TelegramBotHandler:
         app.add_handler(CommandHandler("help", self.handle_help))
         app.add_handler(CommandHandler("persona", self.handle_persona))
         app.add_handler(CommandHandler("personas", self.handle_list_personas))
+        
+        # Individual persona command handlers
+        app.add_handler(CommandHandler("choy", self.handle_choy_persona))
+        app.add_handler(CommandHandler("tony", self.handle_tony_persona))
+        app.add_handler(CommandHandler("rose", self.handle_rose_persona))
+        # Keep stark for backward compatibility
+        app.add_handler(CommandHandler("stark", self.handle_tony_persona))
+        
         app.add_handler(CommandHandler("remember", self.handle_remember))
         app.add_handler(CommandHandler("recall", self.handle_recall))
         app.add_handler(CommandHandler("memories", self.handle_memories))
@@ -559,6 +567,96 @@ _This profile is automatically generated from our conversations._
 This ID is used to link your memories and conversations.
 """
         
+            response += f"• {task_type}: {provider}\n"
+        
+        await update.message.reply_text(response, parse_mode='Markdown')
+
+    # User Profile commands
+    async def handle_profile(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /profile command"""
+        user_id = str(update.effective_user.id)
+        
+        try:
+            if not self.ai_engine.user_profile_manager:
+                await update.message.reply_text("❌ User profile system not available")
+                return
+                
+            profile = await self.ai_engine.user_profile_manager.get_user_profile(user_id)
+            
+            if not profile:
+                response = """
+👤 **User Profile**
+
+No profile data available yet. Chat with me more and I'll automatically build your profile based on our conversations!
+
+**What I track:**
+• Personal information (name, age, location, profession)
+• Interests and preferences
+• Communication patterns
+• Conversation topics and sentiment
+"""
+            else:
+                response = f"""
+👤 **Your AI-Generated Profile**
+
+**Personal Information:**
+• **Name:** {profile.name or 'Not detected'}
+• **Age:** {profile.age or 'Not detected'}
+• **Location:** {profile.city or 'Not detected'}
+• **Profession:** {profile.profession or 'Not detected'}
+
+**Interests:** {', '.join(profile.interests) if profile.interests else 'Learning from conversations...'}
+
+**Communication Style:** {profile.communication_style or 'Analyzing...'}
+
+**Profile Confidence:** {profile.confidence_scores.get('overall', 0.0):.1% if profile.confidence_scores else '0.0%'}
+**Last Updated:** {profile.updated_at.strftime('%Y-%m-%d %H:%M') if hasattr(profile, 'updated_at') and profile.updated_at else 'Unknown'}
+
+_This profile is automatically generated from our conversations._
+"""
+            
+        except Exception as e:
+            self.logger.error(f"Error getting user profile: {e}")
+            response = "❌ Error retrieving profile data."
+        
+        await update.message.reply_text(response, parse_mode='Markdown')
+
+    # Add placeholder for other commands to be implemented
+    async def handle_remember(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /remember command"""
+        await update.message.reply_text("Command under development...")
+    
+    async def handle_recall(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /recall command"""
+        await update.message.reply_text("Command under development...")
+    
+    async def handle_memories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /memories command"""
+        await update.message.reply_text("Command under development...")
+    
+    async def handle_forget(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /forget command"""
+        await update.message.reply_text("Command under development...")
+    
+    async def handle_bio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /bio command"""
+        await update.message.reply_text("Command under development...")
+    
+    async def handle_myid(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /myid command"""
+        user = update.effective_user
+        
+        response = f"""
+👤 **Your User Information:**
+
+**Telegram ID:** `{user.id}`
+**Username:** @{user.username or 'Not set'}
+**Name:** {user.full_name}
+**Language:** {user.language_code or 'Unknown'}
+
+This ID is used to link your memories and conversations.
+"""
+        
         await update.message.reply_text(response, parse_mode='Markdown')
     
     async def handle_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -714,65 +812,3 @@ What would you like to chat about, {user.first_name}? I'm here to help with anyt
                 
             else:
                 # Only show error if message is completely empty
-                response = "I didn't quite understand your answer. Could you please provide that information again?"
-            
-            await update.message.reply_text(response, parse_mode='Markdown')
-            
-        except Exception as e:
-            self.logger.error(f"Error handling onboarding response: {e}")
-            await update.message.reply_text("Sorry, I encountered an error. Please try again.")
-    
-    async def handle_error(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle bot errors"""
-        error = context.error
-        
-        self.logger.error(f"Telegram bot error: {error}")
-        
-        if update and update.effective_message:
-            try:
-                await update.effective_message.reply_text(
-                    "❌ Sorry, something went wrong. Please try again."
-                )
-            except Exception:
-                pass  # Don't log errors for error messages
-    
-    # Utility methods
-    def get_stats(self) -> Dict[str, Any]:
-        """Get bot statistics"""
-        uptime = datetime.now() - self.start_time
-        
-        return {
-            "uptime_seconds": uptime.total_seconds(),
-            "messages_processed": self.message_count,
-            "messages_per_hour": self.message_count / max(uptime.total_seconds() / 3600, 1),
-            "status": "running" if self.application else "stopped"
-        }
-    
-    def _clean_ai_response(self, response: str) -> str:
-        """Clean AI response to remove unwanted theatrical elements"""
-        import re
-        
-        # Remove common theatrical patterns that shouldn't be in responses
-        patterns_to_remove = [
-            r'\*[^*]*\*',  # Remove *actions*
-            r'leans? (?:back|forward|in)[^.]*',
-            r'(?:checks?|glances? at) (?:watch|clock|time)[^.]*',
-            r'pulls? up (?:holographic|virtual|digital)[^.]*',
-            r'(?:in virtual|in digital) (?:chair|space|reality)',
-            r'(?:fingers? )?steepled?[^.]*',
-            r'(?:adjusts?|straightens?) (?:tie|collar|glasses)[^.]*',
-            r'(?:smiles?|grins?|chuckles?|laughs?) (?:slightly|softly|quietly)[^.]*',
-            r'(?:looks?|gazes?) (?:thoughtfully|contemplatively)[^.]*',
-            r'(?:taps?|drums?) (?:fingers?|desk)[^.]*',
-            r'(?:raises?|arches?) (?:eyebrow|brow)[^.]*',
-        ]
-        
-        cleaned_response = response
-        for pattern in patterns_to_remove:
-            cleaned_response = re.sub(pattern, '', cleaned_response, flags=re.IGNORECASE)
-        
-        # Clean up extra whitespace
-        cleaned_response = re.sub(r'\s+', ' ', cleaned_response).strip()
-        cleaned_response = re.sub(r'\n\s*\n', '\n\n', cleaned_response)
-        
-        return cleaned_response
