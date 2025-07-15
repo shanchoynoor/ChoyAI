@@ -26,7 +26,8 @@ class ChatEngine:
         user_memory: UserMemoryManager,
         conversation_memory: ConversationMemoryManager,
         persona_manager: PersonaManager,
-        ai_provider_manager: Optional[AIProviderManager] = None
+        ai_provider_manager: Optional[AIProviderManager] = None,
+        rag_engine: Optional[Any] = None  # Import type hint would create circular dependency
     ):
         self.logger = logging.getLogger(__name__)
         
@@ -38,6 +39,9 @@ class ChatEngine:
         
         # AI Provider Manager
         self.ai_provider_manager = ai_provider_manager
+        
+        # RAG Engine for enhanced context
+        self.rag_engine = rag_engine
         
         # Active conversations cache
         self.active_conversations: Dict[str, int] = {}
@@ -188,7 +192,7 @@ class ChatEngine:
         persona: Any,
         current_message: str
     ) -> Dict[str, Any]:
-        """Build comprehensive context for AI"""
+        """Build comprehensive context for AI with RAG enhancement"""
         
         # Format user information
         user_context = {
@@ -213,11 +217,52 @@ class ChatEngine:
             role = "User" if msg['message_type'] == 'user' else "AI"
             recent_messages.append(f"{role}: {msg['content']}")
         
+        # Enhanced context with RAG if available
+        rag_context = {}
+        if self.rag_engine:
+            try:
+                # Get RAG-enhanced context for the current message
+                user_id = user_info.get('user_id', 'unknown')
+                enhanced_prompt, context_data = await self.rag_engine.enhance_prompt_with_context(
+                    original_prompt=current_message,
+                    user_id=user_id,
+                    context_types=["conversation_rag", "knowledge", "core_facts", "user_memory"],
+                    max_context_length=1200
+                )
+                
+                rag_context = {
+                    "enhanced_available": True,
+                    "context_types": list(context_data.get("contexts", {}).keys()),
+                    "relevance_scores": context_data.get("relevance_scores", {}),
+                    "enhanced_prompt": enhanced_prompt
+                }
+                
+                # Index current conversation for future RAG retrieval
+                full_conversation = "\n".join([
+                    f"User: {current_message}"
+                ] + recent_messages[-3:])  # Include some recent context
+                
+                await self.rag_engine.index_conversation(
+                    user_id=user_id,
+                    conversation_text=full_conversation,
+                    metadata={
+                        "persona": persona.name,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ RAG enhancement failed: {e}")
+                rag_context = {"enhanced_available": False, "error": str(e)}
+        else:
+            rag_context = {"enhanced_available": False, "reason": "RAG engine not initialized"}
+        
         return {
             "user_context": user_context,
             "memories": formatted_memories,
             "recent_conversation": recent_messages,
             "current_message": current_message,
+            "rag_context": rag_context,
             "persona": {
                 "name": persona.name,
                 "style": persona.style,

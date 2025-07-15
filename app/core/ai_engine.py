@@ -26,9 +26,12 @@ from datetime import datetime
 from app.modules.memory.core_memory import CoreMemoryManager
 from app.modules.memory.user_memory import UserMemoryManager
 from app.modules.memory.conversation_memory import ConversationMemoryManager
+from app.modules.memory.vector_memory import VectorMemoryManager
 from app.modules.personas.persona_manager import PersonaManager
 from app.modules.chat.chat_engine import ChatEngine
 from app.modules.users.user_profile_manager import UserProfileManager
+from app.modules.rag_engine import RAGEngine
+from app.modules.conversation_flow import ConversationFlowManager
 from app.core.ai_providers import AIProviderManager, AIMessage, TaskType
 from app.config.settings import settings
 
@@ -56,6 +59,9 @@ class ChoyAIEngine:
         self.core_memory: Optional[CoreMemoryManager] = None
         self.user_memory: Optional[UserMemoryManager] = None
         self.conversation_memory: Optional[ConversationMemoryManager] = None
+        self.vector_memory: Optional[VectorMemoryManager] = None
+        self.rag_engine: Optional[RAGEngine] = None
+        self.conversation_flow: Optional[ConversationFlowManager] = None
         self.persona_manager: Optional[PersonaManager] = None
         self.chat_engine: Optional[ChatEngine] = None
         self.ai_provider_manager: Optional[AIProviderManager] = None
@@ -84,6 +90,20 @@ class ChoyAIEngine:
             self.conversation_memory = ConversationMemoryManager()
             await self.conversation_memory.initialize()
             
+            # Initialize vector memory and RAG engine
+            self.vector_memory = VectorMemoryManager()
+            await self.vector_memory.initialize()
+            
+            self.rag_engine = RAGEngine()
+            await self.rag_engine.initialize()
+            
+            # Initialize conversation flow manager
+            self.conversation_flow = ConversationFlowManager(
+                ai_engine=self,
+                rag_engine=self.rag_engine
+            )
+            await self.conversation_flow.initialize()
+            
             # Initialize persona system
             self.persona_manager = PersonaManager()
             await self.persona_manager.initialize()
@@ -101,7 +121,8 @@ class ChoyAIEngine:
                 user_memory=self.user_memory,
                 conversation_memory=self.conversation_memory,
                 persona_manager=self.persona_manager,
-                ai_provider_manager=self.ai_provider_manager
+                ai_provider_manager=self.ai_provider_manager,
+                rag_engine=self.rag_engine
             )
             await self.chat_engine.initialize()
             
@@ -120,7 +141,7 @@ class ChoyAIEngine:
         context: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Process a user message and generate AI response
+        Process a user message and generate AI response with enhanced conversation flow
         
         Args:
             user_id: Unique user identifier
@@ -166,13 +187,45 @@ class ChoyAIEngine:
                 'updated_profile': updated_profile
             })
             
-            # Process the message through chat engine
-            response = await self.chat_engine.process_message(
-                user_id=user_id,
-                message=message,
-                conversation_context=conversation_ctx,
-                additional_context=enhanced_context
-            )
+            # Process through LangGraph conversation flow if available
+            if self.conversation_flow:
+                try:
+                    response, flow_metadata = await self.conversation_flow.process_conversation(
+                        user_id=user_id,
+                        message=message,
+                        conversation_context={
+                            'platform': platform,
+                            'session_id': conversation_ctx.session_id,
+                            'user_profile': user_profile,
+                            'enhanced_context': enhanced_context
+                        },
+                        persona=conversation_ctx.persona
+                    )
+                    
+                    # Update conversation context with flow metadata
+                    conversation_ctx.context_data = conversation_ctx.context_data or {}
+                    conversation_ctx.context_data.update({
+                        'flow_metadata': flow_metadata,
+                        'processing_method': 'langgraph_flow'
+                    })
+                    
+                    self.logger.debug(f"🔄 Processed via LangGraph flow - Intent: {flow_metadata.get('intent', 'unknown')}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"⚠️ LangGraph flow failed, falling back to chat engine: {e}")
+                    # Fallback to standard chat engine processing
+                    response = await self._process_with_chat_engine(
+                        user_id, message, conversation_ctx, enhanced_context
+                    )
+                    conversation_ctx.context_data = conversation_ctx.context_data or {}
+                    conversation_ctx.context_data['processing_method'] = 'chat_engine_fallback'
+            else:
+                # Standard chat engine processing
+                response = await self._process_with_chat_engine(
+                    user_id, message, conversation_ctx, enhanced_context
+                )
+                conversation_ctx.context_data = conversation_ctx.context_data or {}
+                conversation_ctx.context_data['processing_method'] = 'chat_engine_standard'
             
             # Save AI response to conversation history
             ai_provider = enhanced_context.get('ai_provider_used', 'unknown')
@@ -410,6 +463,21 @@ class ChoyAIEngine:
             platform=platform,
             persona=persona,
             context=enhanced_context
+        )
+
+    async def _process_with_chat_engine(
+        self,
+        user_id: str,
+        message: str,
+        conversation_ctx: ConversationContext,
+        enhanced_context: Dict[str, Any]
+    ) -> str:
+        """Process message using the standard chat engine"""
+        return await self.chat_engine.process_message(
+            user_id=user_id,
+            message=message,
+            conversation_context=conversation_ctx,
+            additional_context=enhanced_context
         )
 
     async def _get_conversation_context(
