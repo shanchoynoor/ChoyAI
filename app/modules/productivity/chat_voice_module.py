@@ -16,7 +16,7 @@ from app.modules.productivity import (
     BaseProductivityModule, ModuleRequest, ModuleResponse, ModuleConfig, ModuleType
 )
 from app.core.ai_providers import TaskType
-from app.modules.conversation_flow import ConversationFlow
+from app.modules.conversation_flow import ConversationFlowManager
 
 
 @dataclass
@@ -45,7 +45,7 @@ class ChatVoiceModule(BaseProductivityModule):
         """Initialize chat and voice capabilities"""
         try:
             # Initialize conversation flow
-            self.conversation_flow = ConversationFlow(self.ai_provider_manager)
+            self.conversation_flow = ConversationFlowManager(self.ai_provider_manager)
             await self.conversation_flow.initialize()
             
             self.logger.info("✅ Chat & Voice module initialized successfully")
