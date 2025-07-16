@@ -479,13 +479,49 @@ class ChoyAIEngine:
         conversation_ctx: ConversationContext,
         enhanced_context: Dict[str, Any]
     ) -> str:
-        """Process message using the standard chat engine"""
-        return await self.chat_engine.process_message(
-            user_id=user_id,
-            message=message,
-            conversation_context=conversation_ctx,
-            additional_context=enhanced_context
-        )
+        """Process message using the chat engine with live data integration"""
+        try:
+            # Get live data for the current persona if needed
+            persona_data = await self.persona_manager.process_message_with_live_data(
+                conversation_ctx.persona, message, user_id
+            )
+            
+            if persona_data.get("error"):
+                self.logger.warning(f"⚠️ Persona processing error: {persona_data['error']}")
+                # Use basic persona without live data
+                persona = await self.persona_manager.get_persona(conversation_ctx.persona)
+            else:
+                persona = persona_data.get("persona")
+                live_data = persona_data.get("live_data")
+                enhanced_context_from_live = persona_data.get("enhanced_context", "")
+                
+                # Add live data context to enhanced_context
+                if live_data:
+                    enhanced_context["live_data"] = live_data
+                    if enhanced_context_from_live:
+                        enhanced_context["live_data_context"] = enhanced_context_from_live
+                        self.logger.info(f"🌐 Integrated live data for {conversation_ctx.persona}: {live_data.get('source', 'unknown')}")
+            
+            # Update conversation context with persona
+            if persona:
+                enhanced_context["current_persona"] = persona.to_dict()
+            
+            return await self.chat_engine.process_message(
+                user_id=user_id,
+                message=message,
+                conversation_context=conversation_ctx,
+                additional_context=enhanced_context
+            )
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error in _process_with_chat_engine with live data: {e}")
+            # Fallback to basic processing without live data
+            return await self.chat_engine.process_message(
+                user_id=user_id,
+                message=message,
+                conversation_context=conversation_ctx,
+                additional_context=enhanced_context
+            )
 
     async def _get_conversation_context(
         self,

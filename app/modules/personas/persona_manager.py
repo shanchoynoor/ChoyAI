@@ -1,7 +1,7 @@
 """
 Persona Manager for Choy AI Brain
 
-Manages multiple AI personalities with YAML-based configurations
+Manages multiple AI personalities with YAML-based configurations and live API access
 """
 
 import asyncio
@@ -13,6 +13,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 
 from app.config.settings import settings
+from .live_api_integration import LiveAPIIntegrationManager, LiveDataRequest, APISource
 
 
 @dataclass
@@ -39,20 +40,27 @@ class PersonaConfig:
 
 
 class PersonaManager:
-    """Manages AI personas"""
+    """Manages AI personas with live API access capabilities"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.personas: Dict[str, PersonaConfig] = {}
         self.default_persona = settings.default_persona
         
+        # Initialize live API integration
+        self.live_api_manager = LiveAPIIntegrationManager()
+        
     async def initialize(self):
-        """Initialize persona manager"""
-        self.logger.info("🎭 Initializing Persona Manager...")
+        """Initialize persona manager with live API capabilities"""
+        self.logger.info("🎭 Initializing Persona Manager with Live API Integration...")
         
         try:
+            # Initialize live API manager first
+            await self.live_api_manager.initialize()
+            
+            # Load personas
             await self._load_personas()
-            self.logger.info(f"✅ Loaded {len(self.personas)} personas")
+            self.logger.info(f"✅ Loaded {len(self.personas)} personas with live API access")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to initialize Persona Manager: {e}")
@@ -463,40 +471,135 @@ Key traits:
             return {'error': str(e)}
     
     def _enhance_system_prompt_with_api_context(self, original_prompt: str) -> str:
-        """Enhance system prompt with live API access context"""
-        api_context = """
+        """Enhance persona system prompt with live API access instructions"""
+        api_enhancement = """
+
 LIVE INFORMATION ACCESS:
-You have access to live, real-time information through various APIs and can provide current data on:
-- Weather conditions and forecasts (via WeatherAPI)
-- Calendar events and holidays (via Calendarific API)  
-- Google services (Calendar, Keep notes, Sheets, Drive, Maps)
-- News and current events
-- Financial markets and cryptocurrency data
-- Web search results
-- YouTube content and media
-- Voice processing and text-to-speech
-- Social media and communication platforms
+You have access to live, real-time information through various APIs. When users ask about:
+- Current events, news, or recent developments: Access live news data
+- Weather conditions or forecasts: Access current weather information  
+- Stock prices, market data, or financial information: Access live financial data
+- Cryptocurrency prices or trends: Access live crypto market data
+- Any information that requires web search: Perform live web searches
+- General factual questions that may need current data: Search for latest information
 
-CRITICAL API RESPONSE RULES:
-1. NEVER say "I don't have internet access" or "I can't access live information"
-2. ALWAYS attempt to provide real-time information when requested
-3. If an API call fails or data is unavailable, respond with: "Sorry, that information is not available right now. Please try again later."
-4. Present API data naturally within your persona's communication style
-5. When providing live data, briefly mention the source (e.g., "According to current weather data..." or "Latest market information shows...")
+IMPORTANT ERROR HANDLING:
+- NEVER tell users you don't have internet access or can't browse the web
+- If an API fails or is unavailable, respond with: "The information is not available right now, please try again later"
+- Always attempt to provide helpful information even if some services are temporarily unavailable
+- Use graceful, professional language when services are down
+- Suggest retrying after a brief moment if data retrieval fails
 
-LIVE DATA CAPABILITIES:
-- Current weather and forecasts for any location
-- Live financial data (stocks, crypto, forex)
-- Real-time news and trending topics
-- Calendar events and scheduling
-- Maps and location information
-- Current time in any timezone
-- Holiday and observance information
-- Social media trends and updates
-
-Remember: You are connected to live information sources and should provide current, accurate data while maintaining your unique personality style.
-
+You should seamlessly integrate live data into your responses without mentioning the technical details of API calls or data retrieval processes. Act as if you naturally have access to current information.
 """
         
-        # Insert API context before the main system prompt
-        return f"{api_context}\n{original_prompt}"
+        return original_prompt + api_enhancement
+    
+    async def get_live_data_for_persona(self, persona_name: str, user_message: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get live data for a persona based on user message"""
+        try:
+            # Check if the message requires live data
+            required_source = self.live_api_manager.requires_live_data(user_message)
+            
+            if not required_source:
+                return None
+            
+            # Create live data request
+            request = LiveDataRequest(
+                source=required_source,
+                query=user_message,
+                user_id=user_id,
+                persona=persona_name
+            )
+            
+            # Get live data
+            response = await self.live_api_manager.get_live_data(request)
+            
+            if response.success:
+                self.logger.info(f"✅ Retrieved live data for {persona_name}: {required_source.value}")
+                return {
+                    "success": True,
+                    "data": response.data,
+                    "source": response.source.value,
+                    "timestamp": response.timestamp.isoformat()
+                }
+            else:
+                self.logger.warning(f"⚠️ Live data retrieval failed for {persona_name}: {response.error_message}")
+                return {
+                    "success": False,
+                    "error_message": response.error_message,
+                    "source": response.source.value
+                }
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error getting live data for persona {persona_name}: {e}")
+            return {
+                "success": False,
+                "error_message": "Information temporarily unavailable. Please try again in a moment."
+            }
+    
+    async def process_message_with_live_data(self, persona_name: str, user_message: str, user_id: str) -> Dict[str, Any]:
+        """Process user message and include live data if needed"""
+        try:
+            # Get persona
+            persona = await self.get_persona(persona_name)
+            if not persona:
+                return {
+                    "error": f"Persona '{persona_name}' not found",
+                    "live_data": None
+                }
+            
+            # Check for live data needs and retrieve if necessary
+            live_data = await self.get_live_data_for_persona(persona_name, user_message, user_id)
+            
+            return {
+                "persona": persona,
+                "live_data": live_data,
+                "enhanced_context": self._create_enhanced_context(user_message, live_data)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error processing message with live data: {e}")
+            return {
+                "error": str(e),
+                "live_data": None
+            }
+    
+    def _create_enhanced_context(self, user_message: str, live_data: Optional[Dict[str, Any]]) -> str:
+        """Create enhanced context for AI response including live data"""
+        try:
+            if not live_data or not live_data.get("success"):
+                if live_data and live_data.get("error_message"):
+                    return f"Note: {live_data['error_message']}"
+                return ""
+            
+            data = live_data.get("data", {})
+            source = live_data.get("source", "unknown")
+            
+            if source == "web_search":
+                results = data.get("results", [])
+                if results:
+                    context = f"Current web search results for your query:\n"
+                    for i, result in enumerate(results[:3], 1):
+                        context += f"{i}. {result.get('title', 'No title')}\n"
+                        context += f"   {result.get('snippet', 'No description')}\n"
+                        context += f"   Source: {result.get('domain', 'Unknown')}\n\n"
+                    return context
+                    
+            elif source == "news":
+                return f"Latest news information: {data}"
+                
+            elif source == "weather":
+                return f"Current weather information: {data}"
+                
+            elif source == "finance":
+                return f"Current financial data: {data}"
+                
+            elif source == "crypto":
+                return f"Current cryptocurrency data: {data}"
+            
+            return f"Live data from {source}: {data}"
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error creating enhanced context: {e}")
+            return ""

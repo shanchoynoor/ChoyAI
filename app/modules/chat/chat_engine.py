@@ -126,19 +126,27 @@ class ChatEngine:
                 user_memories=user_memories,
                 conversation_history=conversation_history,
                 persona=persona,
-                current_message=message
+                current_message=message,
+                additional_context=additional_context
             )
             
-            # Detect and fetch live information if needed
-            live_info = await self._detect_and_fetch_live_info(message, user_id)
+            # Check if live data was already provided via additional_context
+            live_info = additional_context.get("live_data_context") if additional_context else None
+            
+            # If no live data provided, try to detect and fetch
+            if not live_info:
+                live_info = await self._detect_and_fetch_live_info(message, user_id)
+            
             if live_info:
                 ai_context['live_info'] = live_info
-            
-            # Generate AI response
+                self.logger.debug(f"🌐 Added live information to context for user {user_id}")
+
+            # Generate AI response with enhanced context
             response = await self._generate_ai_response(
                 context=ai_context,
                 persona=persona,
-                user_message=message
+                user_message=message,
+                live_data=additional_context.get("live_data") if additional_context else None
             )
             
             # Log AI response
@@ -199,7 +207,8 @@ class ChatEngine:
         user_memories: List[Dict[str, Any]],
         conversation_history: List[Dict[str, Any]],
         persona: Any,
-        current_message: str
+        current_message: str,
+        additional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Build comprehensive context for AI with RAG enhancement"""
         
@@ -485,15 +494,15 @@ class ChatEngine:
         self,
         context: Dict[str, Any],
         persona: Any,
-        user_message: str
+        user_message: str,
+        live_data: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Generate AI response using DeepSeek API"""
+        """Generate AI response with live data integration and graceful error handling"""
         
-        # Build system prompt
-        system_prompt = self._build_system_prompt(context, persona)
+        # Build system prompt with live data instructions
+        system_prompt = self._build_system_prompt(context, persona, live_data)
         
         # Prepare conversation history for API
-        # Convert to AIMessage format for provider system
         ai_messages = []
         ai_messages.append(AIMessage(role="system", content=system_prompt))
         
@@ -503,6 +512,17 @@ class ChatEngine:
                 ai_messages.append(AIMessage(role="user", content=msg_text[6:]))
             elif msg_text.startswith("AI: "):
                 ai_messages.append(AIMessage(role="assistant", content=msg_text[4:]))
+        
+        # Add live information context if available
+        if context.get("live_info"):
+            live_context_msg = f"[LIVE INFORMATION CONTEXT]: {context['live_info']}"
+            ai_messages.append(AIMessage(role="user", content=live_context_msg))
+        
+        # Handle API errors gracefully - if live data failed, include graceful message
+        if live_data and not live_data.get("success"):
+            graceful_msg = live_data.get("error_message", "Some information is temporarily unavailable.")
+            error_context = f"[SYSTEM NOTE]: {graceful_msg} Please respond naturally without mentioning technical limitations."
+            ai_messages.append(AIMessage(role="user", content=error_context))
         
         # Add current message
         ai_messages.append(AIMessage(role="user", content=user_message))
@@ -526,7 +546,7 @@ class ChatEngine:
                 ai_response = self._apply_persona_style(ai_response, persona)
                 
                 # Log which provider was used
-                self.logger.info(f"Response generated using {response.provider} ({response.model})")
+                self.logger.info(f"✅ Response generated using {response.provider} ({response.model})")
                 
                 return ai_response
             else:
@@ -535,7 +555,14 @@ class ChatEngine:
         
         except Exception as e:
             self.logger.error(f"❌ Error generating AI response: {e}")
-            return f"I apologize, but I'm having trouble generating a response right now. Please try again."
+            
+            # Use graceful error messages based on persona
+            if persona.name.lower() == "tony":
+                return "The systems are acting up right now. Give me a moment to sort this out."
+            elif persona.name.lower() == "rose":
+                return "I'm having a little trouble accessing some information right now, but I'm here to help in any way I can."
+            else:  # Default Choy response
+                return "I'm experiencing some technical difficulties at the moment. Let me try again shortly."
     
     def _determine_task_type(self, message: str, persona: Any) -> TaskType:
         """Determine the appropriate task type based on message content and persona"""
@@ -576,14 +603,14 @@ class ChatEngine:
         # Default to conversation
         return TaskType.CONVERSATION
     
-    def _build_system_prompt(self, context: Dict[str, Any], persona: Any) -> str:
-        """Build comprehensive system prompt with user profile"""
+    def _build_system_prompt(self, context: Dict[str, Any], persona: Any, live_data: Optional[Dict[str, Any]] = None) -> str:
+        """Build comprehensive system prompt with user profile and live data capabilities"""
         
         user_ctx = context["user_context"]
         memories = context["memories"]
         user_profile = context.get("user_profile")
         
-        # Start with the core persona prompt
+        # Start with the core persona prompt (which already includes live API instructions)
         prompt = f"""{persona.system_prompt}
 
 PERSONA BIOGRAPHICAL INFORMATION:
@@ -632,6 +659,14 @@ USER INFO:
             for memory in important_memories:
                 prompt += f"- {memory}\n"
         
+        # Add live data context if available
+        if live_data and live_data.get("success"):
+            prompt += f"\n\nLIVE DATA AVAILABLE:\n"
+            data_source = live_data.get("source", "unknown")
+            prompt += f"- Current {data_source} information has been retrieved\n"
+            prompt += f"- Use this information naturally in your response\n"
+            prompt += f"- Don't mention technical details about data retrieval\n"
+        
         prompt += f"""
 RESPONSE RULES:
 1. Be {persona.style.lower()}
@@ -640,6 +675,8 @@ RESPONSE RULES:
 4. Keep responses focused on the user's actual question
 5. Use persona traits: {', '.join(persona.personality_traits[:4])}
 6. Maximum {settings.max_response_length} characters
+7. NEVER mention internet access limitations or API failures
+8. If information is unavailable, respond professionally: "That information isn't available right now"
 """
         
         return prompt.strip()
