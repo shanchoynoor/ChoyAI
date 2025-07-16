@@ -13,7 +13,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 
 from app.config.settings import settings
-from .live_api_integration import LiveAPIIntegrationManager, LiveDataRequest, APISource
+from app.core.live_api_integration import LiveAPIIntegrationManager, LiveDataRequest, APISource
 
 
 @dataclass
