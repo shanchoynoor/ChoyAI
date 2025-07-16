@@ -27,7 +27,8 @@ class ChatEngine:
         conversation_memory: ConversationMemoryManager,
         persona_manager: PersonaManager,
         ai_provider_manager: Optional[AIProviderManager] = None,
-        rag_engine: Optional[Any] = None  # Import type hint would create circular dependency
+        rag_engine: Optional[Any] = None,  # Import type hint would create circular dependency
+        productivity_manager: Optional[Any] = None  # Import type hint would create circular dependency
     ):
         self.logger = logging.getLogger(__name__)
         
@@ -42,6 +43,9 @@ class ChatEngine:
         
         # RAG Engine for enhanced context
         self.rag_engine = rag_engine
+        
+        # Productivity Manager for live information access
+        self.productivity_manager = productivity_manager
         
         # Active conversations cache
         self.active_conversations: Dict[str, int] = {}
@@ -124,6 +128,11 @@ class ChatEngine:
                 persona=persona,
                 current_message=message
             )
+            
+            # Detect and fetch live information if needed
+            live_info = await self._detect_and_fetch_live_info(message, user_id)
+            if live_info:
+                ai_context['live_info'] = live_info
             
             # Generate AI response
             response = await self._generate_ai_response(
@@ -270,6 +279,208 @@ class ChatEngine:
             }
         }
     
+    async def _detect_and_fetch_live_info(self, user_message: str, user_id: str) -> Optional[str]:
+        """Detect if user message requires live information and fetch it"""
+        if not self.productivity_manager:
+            return None
+            
+        try:
+            # Keywords that indicate need for live information
+            live_info_keywords = {
+                'weather': ['weather', 'temperature', 'forecast', 'rain', 'snow', 'sunny', 'cloudy'],
+                'news': ['news', 'latest', 'current events', 'breaking', 'happening now', 'today'],
+                'search': ['search', 'find', 'look up', 'google', 'information about'],
+                'finance': ['stock', 'price', 'market', 'crypto', 'bitcoin', 'trading', 'shares'],
+                'maps': ['location', 'address', 'directions', 'map', 'where is', 'distance'],
+                'time': ['time', 'date', 'today', 'current time', 'what day'],
+                'trends': ['trending', 'popular', 'viral', 'social media trends']
+            }
+            
+            message_lower = user_message.lower()
+            
+            # Check for weather requests
+            if any(keyword in message_lower for keyword in live_info_keywords['weather']):
+                # Extract location if possible
+                location = self._extract_location_from_message(message_lower)
+                if not location:
+                    location = "current location"  # Default
+                
+                from app.modules.productivity import ModuleRequest, ModuleType
+                request = ModuleRequest(
+                    user_id=user_id,
+                    module_type=ModuleType.ONLINE_AGENT,
+                    action="get_weather",
+                    data={"location": location}
+                )
+                
+                response = await self.productivity_manager.process_request(request)
+                if response.success:
+                    return self._format_weather_info(response.data)
+            
+            # Check for news requests
+            elif any(keyword in message_lower for keyword in live_info_keywords['news']):
+                query = self._extract_news_query(message_lower)
+                
+                from app.modules.productivity import ModuleRequest, ModuleType
+                request = ModuleRequest(
+                    user_id=user_id,
+                    module_type=ModuleType.ONLINE_AGENT,
+                    action="get_news",
+                    data={"query": query}
+                )
+                
+                response = await self.productivity_manager.process_request(request)
+                if response.success:
+                    return self._format_news_info(response.data)
+            
+            # Check for general search requests
+            elif any(keyword in message_lower for keyword in live_info_keywords['search']):
+                search_query = self._extract_search_query(user_message)
+                
+                from app.modules.productivity import ModuleRequest, ModuleType
+                request = ModuleRequest(
+                    user_id=user_id,
+                    module_type=ModuleType.ONLINE_AGENT,
+                    action="web_search",
+                    data={"query": search_query, "num_results": 3}
+                )
+                
+                response = await self.productivity_manager.process_request(request)
+                if response.success:
+                    return self._format_search_results(response.data)
+            
+            # Check for financial information
+            elif any(keyword in message_lower for keyword in live_info_keywords['finance']):
+                symbol = self._extract_financial_symbol(message_lower)
+                if symbol:
+                    from app.modules.productivity import ModuleRequest, ModuleType
+                    request = ModuleRequest(
+                        user_id=user_id,
+                        module_type=ModuleType.ONLINE_AGENT,
+                        action="get_finance",
+                        data={"symbol": symbol}
+                    )
+                    
+                    response = await self.productivity_manager.process_request(request)
+                    if response.success:
+                        return self._format_finance_info(response.data)
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error fetching live information: {e}")
+            return None
+    
+    def _extract_location_from_message(self, message: str) -> Optional[str]:
+        """Extract location from user message"""
+        # Simple extraction - could be enhanced with NLP
+        location_indicators = ['in ', 'at ', 'for ', 'weather in ', 'weather for ']
+        for indicator in location_indicators:
+            if indicator in message:
+                parts = message.split(indicator, 1)
+                if len(parts) > 1:
+                    location = parts[1].split()[0:3]  # Take up to 3 words
+                    return ' '.join(location).strip('.,!?')
+        return None
+    
+    def _extract_news_query(self, message: str) -> str:
+        """Extract news query from message"""
+        # Remove common news keywords and extract the topic
+        news_words = ['news', 'latest', 'current events', 'breaking', 'about']
+        query = message
+        for word in news_words:
+            query = query.replace(word, '').strip()
+        return query or "latest news"
+    
+    def _extract_search_query(self, message: str) -> str:
+        """Extract search query from message"""
+        # Remove search keywords
+        search_words = ['search', 'find', 'look up', 'google', 'information about']
+        query = message
+        for word in search_words:
+            query = query.replace(word, '').strip()
+        return query or message
+    
+    def _extract_financial_symbol(self, message: str) -> Optional[str]:
+        """Extract financial symbol from message"""
+        # Look for common stock symbols or crypto names
+        common_symbols = ['AAPL', 'GOOGL', 'TSLA', 'MSFT', 'AMZN', 'BTC', 'ETH', 'bitcoin', 'ethereum']
+        words = message.upper().split()
+        for word in words:
+            if word in [s.upper() for s in common_symbols]:
+                return word
+        return None
+    
+    def _format_weather_info(self, weather_data: Dict[str, Any]) -> str:
+        """Format weather information for AI context"""
+        if not weather_data:
+            return "Weather information is not available."
+        
+        current = weather_data.get('current', {})
+        location = weather_data.get('location', 'Unknown location')
+        
+        info = f"Current weather for {location}:\n"
+        info += f"Temperature: {current.get('temperature_c', 'N/A')}°C ({current.get('temperature_f', 'N/A')}°F)\n"
+        info += f"Condition: {current.get('condition', 'N/A')}\n"
+        info += f"Humidity: {current.get('humidity', 'N/A')}%\n"
+        info += f"Wind: {current.get('wind_speed_kph', 'N/A')} km/h\n"
+        
+        return info
+    
+    def _format_news_info(self, news_data: Dict[str, Any]) -> str:
+        """Format news information for AI context"""
+        if not news_data or not news_data.get('articles'):
+            return "No recent news found."
+        
+        articles = news_data.get('articles', [])[:3]  # Top 3 articles
+        info = "Latest news:\n"
+        
+        for i, article in enumerate(articles, 1):
+            info += f"{i}. {article.get('headline', 'No title')}\n"
+            info += f"   {article.get('summary', 'No summary')}\n"
+            info += f"   Source: {article.get('source', 'Unknown')}\n\n"
+        
+        return info
+    
+    def _format_search_results(self, search_data: Dict[str, Any]) -> str:
+        """Format search results for AI context"""
+        if not search_data or not search_data.get('results'):
+            return "No search results found."
+        
+        results = search_data.get('results', [])[:3]  # Top 3 results
+        query = search_data.get('query', 'search')
+        
+        info = f"Search results for '{query}':\n"
+        
+        for i, result in enumerate(results, 1):
+            info += f"{i}. {result.get('title', 'No title')}\n"
+            info += f"   {result.get('snippet', 'No description')}\n"
+            info += f"   URL: {result.get('url', 'No URL')}\n\n"
+        
+        return info
+    
+    def _format_finance_info(self, finance_data: Dict[str, Any]) -> str:
+        """Format financial information for AI context"""
+        if not finance_data:
+            return "Financial information is not available."
+        
+        symbol = finance_data.get('symbol', 'Unknown')
+        info = f"Financial information for {symbol}:\n"
+        
+        # Check if there's an answer box with current price
+        answer_box = finance_data.get('answer_box')
+        if answer_box:
+            info += f"Current data: {answer_box}\n"
+        
+        # Include search results for additional context
+        search_results = finance_data.get('search_results', [])
+        if search_results:
+            info += "Recent market information:\n"
+            for result in search_results[:2]:
+                info += f"- {result.get('snippet', 'No information')}\n"
+        
+        return info
+
     async def _generate_ai_response(
         self,
         context: Dict[str, Any],

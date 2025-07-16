@@ -251,6 +251,10 @@ class ProductivityModuleManager:
                 from app.modules.productivity.messaging_module import MessagingModule
                 return MessagingModule(config, self.ai_provider_manager)
             
+            elif config.module_type == ModuleType.ONLINE_AGENT:
+                from app.modules.productivity.online_agent_module import OnlineAgentModule
+                return OnlineAgentModule(config, self.ai_provider_manager)
+            
             # Placeholder for unimplemented modules
             else:
                 raise NotImplementedError(f"Module {config.module_type.value} not implemented yet")
@@ -380,11 +384,11 @@ class ProductivityModuleManager:
             ModuleConfig(
                 module_type=ModuleType.ONLINE_AGENT,
                 name="Online Agent",
-                description="Automated online services integration",
+                description="Web search and live information access",
                 cost_limit_daily=2.0,
-                external_apis=["uber_api", "booking_api"],
+                external_apis=["serper_api", "weather_api", "news_api", "perplexity_api"],
                 local_storage=True,
-                enabled=False  # Implement later
+                enabled=True  # Enable the online agent module
             )
         ]
     

@@ -258,8 +258,33 @@ Key traits:
         self.logger.debug(f"💾 Saved persona to {file_path}")
     
     async def get_persona(self, name: str) -> Optional[PersonaConfig]:
-        """Get persona by name"""
-        return self.personas.get(name.lower())
+        """Get persona by name with enhanced API context"""
+        persona = self.personas.get(name.lower())
+        if not persona:
+            return None
+        
+        # Add live API access instructions to system prompt
+        enhanced_system_prompt = self._enhance_system_prompt_with_api_context(persona.system_prompt)
+        
+        # Create enhanced persona config
+        enhanced_persona = PersonaConfig(
+            name=persona.name,
+            display_name=persona.display_name,
+            style=persona.style,
+            purpose=persona.purpose,
+            description=persona.description,
+            system_prompt=enhanced_system_prompt,
+            personality_traits=persona.personality_traits,
+            response_style=persona.response_style,
+            example_responses=persona.example_responses,
+            voice_tone=persona.voice_tone,
+            emoji_usage=persona.emoji_usage,
+            short_bio=persona.short_bio,
+            created_at=persona.created_at,
+            updated_at=persona.updated_at
+        )
+        
+        return enhanced_persona
     
     async def list_personas(self) -> List[PersonaConfig]:
         """List all available personas"""
@@ -436,3 +461,42 @@ Key traits:
             
         except Exception as e:
             return {'error': str(e)}
+    
+    def _enhance_system_prompt_with_api_context(self, original_prompt: str) -> str:
+        """Enhance system prompt with live API access context"""
+        api_context = """
+LIVE INFORMATION ACCESS:
+You have access to live, real-time information through various APIs and can provide current data on:
+- Weather conditions and forecasts (via WeatherAPI)
+- Calendar events and holidays (via Calendarific API)  
+- Google services (Calendar, Keep notes, Sheets, Drive, Maps)
+- News and current events
+- Financial markets and cryptocurrency data
+- Web search results
+- YouTube content and media
+- Voice processing and text-to-speech
+- Social media and communication platforms
+
+CRITICAL API RESPONSE RULES:
+1. NEVER say "I don't have internet access" or "I can't access live information"
+2. ALWAYS attempt to provide real-time information when requested
+3. If an API call fails or data is unavailable, respond with: "Sorry, that information is not available right now. Please try again later."
+4. Present API data naturally within your persona's communication style
+5. When providing live data, briefly mention the source (e.g., "According to current weather data..." or "Latest market information shows...")
+
+LIVE DATA CAPABILITIES:
+- Current weather and forecasts for any location
+- Live financial data (stocks, crypto, forex)
+- Real-time news and trending topics
+- Calendar events and scheduling
+- Maps and location information
+- Current time in any timezone
+- Holiday and observance information
+- Social media trends and updates
+
+Remember: You are connected to live information sources and should provide current, accurate data while maintaining your unique personality style.
+
+"""
+        
+        # Insert API context before the main system prompt
+        return f"{api_context}\n{original_prompt}"

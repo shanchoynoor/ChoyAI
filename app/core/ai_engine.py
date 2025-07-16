@@ -32,6 +32,7 @@ from app.modules.chat.chat_engine import ChatEngine
 from app.modules.users.user_profile_manager import UserProfileManager
 from app.modules.rag_engine import RAGEngine
 from app.modules.conversation_flow import ConversationFlowManager
+from app.modules.productivity import ProductivityModuleManager
 from app.core.ai_providers import AIProviderManager, AIMessage, TaskType
 from app.config.settings import settings
 
@@ -66,6 +67,7 @@ class ChoyAIEngine:
         self.chat_engine: Optional[ChatEngine] = None
         self.ai_provider_manager: Optional[AIProviderManager] = None
         self.user_profile_manager: Optional[UserProfileManager] = None
+        self.productivity_manager: Optional[ProductivityModuleManager] = None
         
         # Active conversations
         self.active_conversations: Dict[str, ConversationContext] = {}
@@ -115,6 +117,10 @@ class ChoyAIEngine:
             self.ai_provider_manager = AIProviderManager()
             await self.ai_provider_manager.initialize()
             
+            # Initialize productivity module manager
+            self.productivity_manager = ProductivityModuleManager(self.ai_provider_manager)
+            await self.productivity_manager.initialize()
+            
             # Initialize chat engine with AI provider manager
             self.chat_engine = ChatEngine(
                 core_memory=self.core_memory,
@@ -122,7 +128,8 @@ class ChoyAIEngine:
                 conversation_memory=self.conversation_memory,
                 persona_manager=self.persona_manager,
                 ai_provider_manager=self.ai_provider_manager,
-                rag_engine=self.rag_engine
+                rag_engine=self.rag_engine,
+                productivity_manager=self.productivity_manager
             )
             await self.chat_engine.initialize()
             
