@@ -85,7 +85,7 @@ ChoyAI/
 ├── 🎭 templates/                   # Template files
 │   └── personas/                   # AI persona definitions
 │       ├── choy.yaml
-│       ├── stark.yaml
+│       ├── tony.yaml
 │       └── rose.yaml
 │
 ├── 🧪 tests/                       # Test files (empty, ready for tests)

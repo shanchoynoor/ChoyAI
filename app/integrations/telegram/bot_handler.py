@@ -207,7 +207,7 @@ class TelegramBotHandler:
         app.add_handler(CommandHandler("choy", self.handle_choy_persona))
         app.add_handler(CommandHandler("tony", self.handle_tony_persona))
         app.add_handler(CommandHandler("rose", self.handle_rose_persona))
-        # Keep stark for backward compatibility
+        # Keep stark for backward compatibility (will be removed in future version)
         app.add_handler(CommandHandler("stark", self.handle_tony_persona))
         
         app.add_handler(CommandHandler("remember", self.handle_remember))
@@ -350,7 +350,7 @@ I'm your intelligent personal assistant with long-term memory and multiple perso
 
 **Current Personalities:**
 🎭 **choy** - Confident, strategic, direct (default)
-🤖 **stark** - Tech genius, sarcastic, innovative  
+🤖 **tony** - Tech genius, sarcastic, innovative  
 🌹 **rose** - Warm, empathetic, supportive
 
 Just start chatting with me naturally! I'll remember our conversations and provide personalized assistance.
@@ -761,7 +761,7 @@ Perfect! Thank you for sharing those details with me. 🎉
 Now I can provide you with more personalized assistance! I'm Choy AI, and by default, I have a confident, strategic, and direct personality. 
 
 You can switch to different personalities anytime:
-• `/persona stark` - Tech genius, sarcastic, innovative
+• `/persona tony` - Tech genius, sarcastic, innovative
 • `/persona rose` - Warm, empathetic, supportive  
 • `/persona choy` - Back to confident, strategic, direct
 

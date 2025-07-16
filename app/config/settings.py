@@ -232,7 +232,7 @@ class Settings(BaseSettings):
     
     available_personas: List[str] = Field(
         default=[
-            "choy", "stark", "rose", "sherlock", 
+            "choy", "tony", "rose", "sherlock", 
             "joker", "hermione", "harley"
         ],
         description="List of available personas"
@@ -250,7 +250,7 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [persona.strip() for persona in v.split(',') if persona.strip()]
         return v or [
-            "choy", "stark", "rose", "sherlock", 
+            "choy", "tony", "rose", "sherlock", 
             "joker", "hermione", "harley"
         ]
     

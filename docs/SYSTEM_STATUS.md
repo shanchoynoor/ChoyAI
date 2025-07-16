@@ -22,7 +22,7 @@
 ### ✅ Code Architecture (COMPLETED)
 - **AI Engine:** Multi-provider support (DeepSeek, OpenAI, Anthropic, xAI, Gemini)
 - **Memory System:** Three-layer memory with persistent storage
-- **Persona System:** YAML-based personalities (Choy, Stark, Rose)
+- **Persona System:** YAML-based personalities (Choy, Tony, Rose)
 - **Telegram Integration:** Full bot handler implementation
 - **Health Monitoring:** API endpoints for system monitoring
 

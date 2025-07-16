@@ -5,7 +5,7 @@
 ### **Duplicate Content Files**
 - `templates/prompts/` directory (entire folder)
   - `choy.txt` - JSON format persona (duplicate of choy.yaml)
-  - `stark.txt` - JSON format persona (duplicate of stark.yaml) 
+  - `tony.txt` - JSON format persona (duplicate of tony.yaml) 
   - `rose.txt` - JSON format persona (duplicate of rose.yaml)
 
 ### **Redundant Documentation Files**
@@ -38,7 +38,7 @@
 ### Templates (`templates/`)
 - ✅ `personas/` - YAML-based persona definitions only
   - `choy.yaml`
-  - `stark.yaml` 
+  - `tony.yaml` 
   - `rose.yaml`
 
 ### Utilities (`app/utils/`)

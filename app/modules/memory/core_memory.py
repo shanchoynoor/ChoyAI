@@ -138,7 +138,7 @@ class CoreMemoryManager:
                 
                 # Personas
                 ("personas", "default", "choy", "Default persona"),
-                ("personas", "available", "choy,stark,rose", "Available personas"),
+                ("personas", "available", "choy,tony,rose", "Available personas"),
                 
                 # Platform info
                 ("platform", "telegram", "Active", "Telegram integration status"),
