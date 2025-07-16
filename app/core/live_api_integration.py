@@ -16,7 +16,7 @@ from enum import Enum
 import re
 import html
 
-from app.config.settings import get_settings
+from app.config.settings import settings
 
 
 class APISource(Enum):
@@ -62,7 +62,7 @@ class LiveAPIIntegrationManager:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.settings = get_settings()
+        self.settings = settings
         self.session: Optional[aiohttp.ClientSession] = None
         
         # API configurations
